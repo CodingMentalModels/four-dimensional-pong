@@ -129,4 +129,25 @@ Bevy Game Engine
 * Position(w, x, y, z)
 * Velocity(w, x, y, z)
 * IsCollidable
-* 
+* Score
+
+
+#### Systems
+* Game
+    * UserInputSystem: Keypresses, Mouse -> Position of Blue Paddle
+    * OpponentAISystem: Position of Ball, Velocity of Ball -> Position of Red Paddle
+    * BallMovementSystem: Position of Ball, Velocity of Ball -> Position
+    * CollisionSystem: Position of Ball, Position of Y -> Velocity of Ball, Score Events
+    * ScoreSystem: Score -> Updating the UI
+    * RenderSystem: Positions -> Color of Ball, Transforms in Scene
+* Pause
+* Gameover / Victory
+
+
+## Design Questions / Decisions
+* AssetServer for the Blender Scene -- Currently doing the easy, simple thing (asset_server.load) but might want to use the more thorough approach later.
+* How can we use asset_server to load or create sub-entities from the glb?
+
+
+## Mistakes
+

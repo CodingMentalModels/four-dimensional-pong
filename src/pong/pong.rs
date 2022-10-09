@@ -28,7 +28,8 @@ impl Plugin for PongPlugin {
         .add_startup_system(stage_load_system)
         .add_startup_system(ui_load_system)
         .add_startup_system(ball_initial_velocity_system)
-        .add_system(ball_movement_system);
+        .add_system(ball_movement_system)
+        .add_system(render_system);
     }
 }
 
@@ -74,7 +75,7 @@ struct PositionComponent(Vec4);
 struct VelocityComponent(Vec4);
 
 #[derive(Component)]
-struct MaterialComponent(StandardMaterial);
+struct MaterialHandleComponent(Handle<StandardMaterial>);
 
 #[derive(Component)]
 struct NeedsRenderingComponent;
@@ -89,11 +90,15 @@ fn stage_load_system(
     asset_server: Res<AssetServer>,
 ) {
         let scene = asset_server.load("four-dimensional-pong.glb#Scene0");
-        let ball = asset_server.load("four-dimensional-pong.glb#Mesh6");
-        let ball_material = asset_server.load("four-dimensional-pong.glb#Material2");
-        let player_paddle = asset_server.load("four-dimensional-pong.glb#Mesh1");
+        
+        let ball = asset_server.load("four-dimensional-pong.glb#Mesh2");
+        let player_paddle = asset_server.load("four-dimensional-pong.glb#Mesh3");
         let opponent_paddle = asset_server.load("four-dimensional-pong.glb#Mesh4");
 
+        let ball_material = asset_server.load("four-dimensional-pong.glb#Material0");
+        let player_paddle_material = asset_server.load("four-dimensional-pong.glb#Material1");
+        let opponent_paddle_material = asset_server.load("four-dimensional-pong.glb#Material2");
+        
         commands.spawn_bundle(
             SceneBundle {
                 scene: scene,
@@ -105,31 +110,36 @@ fn stage_load_system(
         commands.spawn_bundle(
             PbrBundle {
                 mesh: ball,
-                material: ball_material,
+                material: ball_material.clone(),
                 ..Default::default()
             }
         ).insert(BallComponent)
         .insert(PositionComponent(Vec4::ZERO))
         .insert(VelocityComponent(Vec4::ZERO))
+        .insert(MaterialHandleComponent(ball_material))
         .insert(NeedsRenderingComponent);
 
         commands.spawn_bundle(
             PbrBundle {
                 mesh: player_paddle,
+                material: player_paddle_material.clone(),
                 ..Default::default()
             }
         ).insert(PaddleComponent)
         .insert(PositionComponent(Vec4::new(0., 0., 0., -ARENA_LENGTH)))
+        .insert(MaterialHandleComponent(player_paddle_material))
         .insert(NeedsRenderingComponent);
 
         
         commands.spawn_bundle(
             PbrBundle {
                 mesh: opponent_paddle,
+                material: opponent_paddle_material.clone(),
                 ..Default::default()
             }
         ).insert(PaddleComponent)
         .insert(PositionComponent(Vec4::new(0., 0., 0., ARENA_LENGTH)))
+        .insert(MaterialHandleComponent(opponent_paddle_material))
         .insert(NeedsRenderingComponent);
 
         let x_from_blender = 0.019767;
@@ -230,12 +240,19 @@ fn ball_movement_system(
 }
 
 fn render_system(
-    mut commands: Commands,
-    mut query: Query<(&mut Transform, &mut MaterialComponent, &PositionComponent), With<NeedsRenderingComponent>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent), With<NeedsRenderingComponent>>,
 ) {
-    for (mut transform, mut material, position) in query.iter_mut() {
+    for (mut transform, material, position) in query.iter_mut() {
         *transform = transform.with_translation(position.0.truncate());
-        material.0.base_color = get_color_from_w(position.0.w, ARENA_LENGTH);
+        match materials.get_mut(&material.0) {
+            Some(material) => {
+                material.base_color = get_color_from_w(position.0.w, ARENA_LENGTH);
+            },
+            None => {
+                panic!("Material not found.");
+            }
+        }
     }
 }
 
@@ -281,10 +298,14 @@ mod test_pong_plugin {
         app.world.contains_resource::<WindowDescriptor>();
         app.world.contains_resource::<AmbientLight>();
         assert_eq!(app.world.query::<&PositionComponent>().iter(&app.world).count(), 3);
+        assert_eq!(app.world.query::<&MaterialHandleComponent>().iter(&app.world).count(), 3);
         assert_eq!(app.world.query::<&VelocityComponent>().iter(&app.world).count(), 1);
         for (velocity) in app.world.query::<&VelocityComponent>().iter(&app.world) {
             assert!(velocity.0.truncate().distance(Vec3::new(0.0, 0.0, 0.0)) < 0.0001);
-            assert!(velocity.0.w == 1.0 || velocity.0.w == -1.0);
+        }
+        for (velocity, _) in app.world.query::<(&VelocityComponent, &BallComponent)>().iter(&app.world) {
+            assert!(velocity.0.w == 1.0 || velocity.0.w == -1.0, "Velocity w component should be +1 or -1 but is: {}", velocity.0.w);;
+            assert!(velocity.0.length() == 1.0);
         }
     }
 }

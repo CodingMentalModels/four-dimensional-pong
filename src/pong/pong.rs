@@ -68,11 +68,13 @@ struct GoalComponent;
 struct WallComponent;
 
 #[derive(Component)]
-struct PositionComponent(Vec3);
+struct PositionComponent(Vec4);
 
 #[derive(Component)]
-struct VelocityComponent(Vec3);
+struct VelocityComponent(Vec4);
 
+#[derive(Component)]
+struct MaterialComponent(StandardMaterial);
 
 #[derive(Component)]
 struct NeedsRenderingComponent;
@@ -107,8 +109,8 @@ fn stage_load_system(
                 ..Default::default()
             }
         ).insert(BallComponent)
-        .insert(PositionComponent(Vec3::new(0., 0., 0.)))
-        .insert(VelocityComponent(Vec3::new(0., 0., 0.)))
+        .insert(PositionComponent(Vec4::ZERO))
+        .insert(VelocityComponent(Vec4::ZERO))
         .insert(NeedsRenderingComponent);
 
         commands.spawn_bundle(
@@ -117,7 +119,7 @@ fn stage_load_system(
                 ..Default::default()
             }
         ).insert(PaddleComponent)
-        .insert(PositionComponent(Vec3::new(0., 0., -ARENA_LENGTH)))
+        .insert(PositionComponent(Vec4::new(0., 0., 0., -ARENA_LENGTH)))
         .insert(NeedsRenderingComponent);
 
         
@@ -127,7 +129,7 @@ fn stage_load_system(
                 ..Default::default()
             }
         ).insert(PaddleComponent)
-        .insert(PositionComponent(Vec3::new(0., 0., ARENA_LENGTH)))
+        .insert(PositionComponent(Vec4::new(0., 0., 0., ARENA_LENGTH)))
         .insert(NeedsRenderingComponent);
 
         let x_from_blender = 0.019767;
@@ -229,23 +231,23 @@ fn ball_movement_system(
 
 fn render_system(
     mut commands: Commands,
-    mut query: Query<(&mut Transform, &mut StandardMaterial, &PositionComponent), With<NeedsRenderingComponent>>,
+    mut query: Query<(&mut Transform, &mut MaterialComponent, &PositionComponent), With<NeedsRenderingComponent>>,
 ) {
     for (mut transform, mut material, position) in query.iter_mut() {
-        transform = transform.with_translation(position.0.truncate());
-        material = material.with_color(get_color_from_w(position.0.w, ARENA_LENGTH));
+        *transform = transform.with_translation(position.0.truncate());
+        material.0.base_color = get_color_from_w(position.0.w, ARENA_LENGTH);
     }
 }
 
 fn get_color_from_w(w: f32, arena_length: f32) -> Color {
-    let blue = Color::BLUE.as_hsla();
-    let red = Color::RED.as_hsla();
-    let saturation = blue.1;
-    let lightness = blue.2;
-    let alpha = blue.3;
+    let blue = Color::BLUE.as_hsla_f32();
+    let red = Color::RED.as_hsla_f32();
+    let saturation = blue[1];
+    let lightness = blue[2];
+    let alpha = blue[3];
     let factor = (w + arena_length) / (2.0 * arena_length);
     Color::Hsla {
-        hue: lerp(blue.0, red.0, factor),
+        hue: lerp(blue[0], red[0], factor),
         saturation: saturation,
         lightness: lightness,
         alpha: alpha
@@ -261,20 +263,26 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
 
 #[cfg(test)]
 mod test_pong_plugin {
+    use bevy::asset::AssetPlugin;
+
     use super::*;
 
     #[test]
     fn test_pong_plugin_initializes() {
-        let app = App::new()
-            .add_plugin(PongPlugin)
-            .run();
+        let mut app = App::new();
+        app
+            .add_plugins(MinimalPlugins)
+            .add_plugin(AssetPlugin)
+            .add_plugin(PongPlugin);
+
+        app.update();
 
         app.world.contains_resource::<Time>();
         app.world.contains_resource::<WindowDescriptor>();
         app.world.contains_resource::<AmbientLight>();
-        app.query::<&PositionComponent>().iter().count() == 3;
-        app.query::<&VelocityComponent>().iter().count() == 1;
-        for (velocity) in app.query::<&VelocityComponent>() {
+        assert_eq!(app.world.query::<&PositionComponent>().iter(&app.world).count(), 3);
+        assert_eq!(app.world.query::<&VelocityComponent>().iter(&app.world).count(), 1);
+        for (velocity) in app.world.query::<&VelocityComponent>().iter(&app.world) {
             assert!(velocity.0.truncate().distance(Vec3::new(0.0, 0.0, 0.0)) < 0.0001);
             assert!(velocity.0.w == 1.0 || velocity.0.w == -1.0);
         }

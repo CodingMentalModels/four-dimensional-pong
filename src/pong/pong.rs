@@ -2,6 +2,7 @@ use std::vec;
 use rand::{seq::SliceRandom, distributions::Standard};
 
 use bevy::{prelude::*, window::{PresentMode}, gltf::{Gltf, GltfMesh}, asset::LoadState};
+use iyes_loopless::prelude::*;
 
 const GLTF_PATH: &str = "pong.glb";
 const ARENA_LENGTH: f32 = 2.0;
@@ -25,26 +26,40 @@ impl Plugin for PongPlugin {
                 color: Color::WHITE,
                 brightness: 1.0 / 2.0,
             }
-        ).insert_resource(Time::default())
-        .insert_resource(GltfModel(None))
-        .add_startup_system(load_gltf)
-        .add_startup_system(stage_load_system.after(load_gltf))
-        .add_startup_system(ui_load_system)
-        .add_startup_system(ball_initial_velocity_system)
-        .add_system(ball_movement_system)
-        .add_system(render_system);
+        ).insert_resource(PongState::LoadingAssets)
+        .insert_resource(Time::default())
+        .add_startup_system(load_gltf.run_if(in_loading_assets_state))
+        .add_system(stage_load_system.run_if(in_loading_assets_state))
+        .add_startup_system(ui_load_system.run_if(in_game_state))
+        .add_startup_system(ball_initial_velocity_system.run_if(in_game_state))
+        .add_system(ball_movement_system.run_if(in_game_state))
+        .add_system(render_system.run_if(in_game_state));
     }
 }
 
 // Run Conditions
 
+fn in_loading_assets_state(pong_state: Res<PongState>) -> bool {
+    *pong_state == PongState::LoadingAssets
+}
+
+fn in_game_state(pong_state: Res<PongState>) -> bool {
+    *pong_state == PongState::InGame
+}
 
 // End Run Conditions
 
 
 // Resources
 
-struct GltfModel(Option<Handle<Gltf>>);
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PongState {
+    LoadingAssets,
+    InGame,
+    Paused,
+}
+
+struct GltfModel(Handle<Gltf>);
 
 // End Resources
 
@@ -91,40 +106,46 @@ struct NeedsRenderingComponent;
 fn load_gltf(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut model: ResMut<GltfModel>,
 ) {
     let gltf = asset_server.load(GLTF_PATH);
     if asset_server.get_load_state(gltf.clone()) == LoadState::Failed {
         println!("Immediately failed to load gltf.");
     }
-    let mut loading = true;
-    let mut timer = 0;
-    while loading {
-        match asset_server.get_load_state(gltf.clone()) {
-            LoadState::Loaded => {
-                loading = false;
-            }
-            LoadState::Failed => {
-                panic!("Failed to load gltf after {} ms", timer);
-            }
-            _ => {}
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        timer += 10;
-    }
+    // let mut loading = true;
+    // let mut timer = 0;
+    // while loading {
+    //     match asset_server.get_load_state(gltf.clone()) {
+    //         LoadState::Loaded => {
+    //             loading = false;
+    //         }
+    //         LoadState::Failed => {
+    //             panic!("Failed to load gltf after {} ms", timer);
+    //         }
+    //         _ => {}
+    //     }
+    //     std::thread::sleep(std::time::Duration::from_millis(10));
+    //     timer += 10;
+    //     if timer > 10000 {
+    //         panic!("Timed out loading gltf after {} ms with state {:?}", timer, asset_server.get_load_state(gltf.clone()));
+    //     }
+    // }
 
-    *model = GltfModel(Some(gltf));
+    commands.insert_resource(GltfModel(gltf));
 }
 
 fn stage_load_system(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     model: Res<GltfModel>,
     assets_gltf: Res<Assets<Gltf>>,
-    assets_gltf_meshes: Res<Assets<GltfMesh>>
+    assets_gltf_meshes: Res<Assets<GltfMesh>>,
+    mut pong_state: ResMut<PongState>,
 ) {
+    if asset_server.get_load_state(&model.0) == LoadState::Failed {
+        println!("Failed to load gltf.");
+    }
 
-    let model = model.0.as_ref().expect("Model not loaded");
-    if let Some(model_root) = assets_gltf.get(&model) {
+    if let Some(model_root) = assets_gltf.get(&model.0) {
 
         let scene = model_root.scenes[0].clone();
         
@@ -188,8 +209,8 @@ fn stage_load_system(
             transform: Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y),
             ..default()
         });
-    } else {
-        panic!("Gltf not loaded!");
+
+        *pong_state = PongState::InGame;
     }
 }
 
@@ -335,10 +356,10 @@ mod test_pong_plugin {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
             .add_plugin(AssetPlugin)
-            .add_startup_system(load_gltf)
-            .insert_resource(GltfModel(None));
+            .add_startup_system(load_gltf);
 
         app.update();
+        std::thread::sleep(std::time::Duration::from_secs(1));
                 
         app.world.contains_resource::<AssetServer>();
         let asset_server = app.world.get_resource::<AssetServer>().expect("AssetServer should exist.");
@@ -347,9 +368,7 @@ mod test_pong_plugin {
         let model = app.world.get_resource::<GltfModel>();
         assert!(model.is_some());
         let model = model.unwrap();
-        assert!(model.0.is_some());
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        assert!(asset_server.get_load_state(model.0.clone().unwrap()) == LoadState::Loaded);
+        assert!(asset_server.get_load_state(model.0.clone()) == LoadState::Loaded);
         
     }
 

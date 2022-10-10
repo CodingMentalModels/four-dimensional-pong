@@ -94,18 +94,23 @@ fn load_gltf(
     mut model: ResMut<GltfModel>,
 ) {
     let gltf = asset_server.load(GLTF_PATH);
+    if asset_server.get_load_state(gltf.clone()) == LoadState::Failed {
+        println!("Immediately failed to load gltf.");
+    }
     let mut loading = true;
+    let mut timer = 0;
     while loading {
         match asset_server.get_load_state(gltf.clone()) {
             LoadState::Loaded => {
                 loading = false;
             }
             LoadState::Failed => {
-                panic!("Failed to load gltf");
+                panic!("Failed to load gltf after {} ms", timer);
             }
             _ => {}
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
+        timer += 10;
     }
 
     *model = GltfModel(Some(gltf));
@@ -324,6 +329,29 @@ mod test_pong_plugin {
     use bevy::asset::AssetPlugin;
 
     use super::*;
+
+    #[test]
+    fn test_assets_load() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugin(AssetPlugin)
+            .add_startup_system(load_gltf)
+            .insert_resource(GltfModel(None));
+
+        app.update();
+                
+        app.world.contains_resource::<AssetServer>();
+        let asset_server = app.world.get_resource::<AssetServer>().expect("AssetServer should exist.");
+        app.world.contains_resource::<GltfModel>();
+
+        let model = app.world.get_resource::<GltfModel>();
+        assert!(model.is_some());
+        let model = model.unwrap();
+        assert!(model.0.is_some());
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        assert!(asset_server.get_load_state(model.0.clone().unwrap()) == LoadState::Loaded);
+        
+    }
 
     #[test]
     fn test_pong_plugin_initializes() {

@@ -150,4 +150,10 @@ Bevy Game Engine
 
 
 ## Mistakes
-
+* We spent a long time trying to debug why asset loading had started to fail:
+    * But we hadn't written a minimal test to narrow down the issue.  This took 5 minutes and would have led to earlier progress.
+    * We didn't recognize that if `load` doesn't block and there's nowhere where we're joining back the results of the asset loading thread (which clearly there isn't since we have no access to it), then we can't expect the state to change within our load function.  
+    * We also didn't think through why the code example wouldn't have an `else` case when failing to find the asset in `Assets`.  
+* We misunderstood how `iyes_loopless` states were instantiated and spent some time with two versions of those states, leading to confusing error messages.
+    * Noticed that `NextState` was being used and thought about what that could be.
+    * Bit the bullet on loopless states not being explicitly instantiated and tried to work out how that could be.

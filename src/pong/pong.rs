@@ -27,7 +27,6 @@ impl Plugin for PongPlugin {
                 brightness: 1.0 / 2.0,
             }
         ).insert_resource(Time::default())
-        .insert_resource(PongState::LoadingAssets)
         .add_loopless_state(PongState::LoadingAssets)
         .add_startup_system(load_gltf)
         .add_system(stage_load_system.run_in_state(PongState::LoadingAssets))
@@ -39,14 +38,6 @@ impl Plugin for PongPlugin {
 }
 
 // Run Conditions
-
-fn in_loading_assets_state(pong_state: Res<PongState>) -> bool {
-    *pong_state == PongState::LoadingAssets
-}
-
-fn in_game_state(pong_state: Res<PongState>) -> bool {
-    *pong_state == PongState::InGame
-}
 
 // End Run Conditions
 
@@ -121,7 +112,6 @@ fn stage_load_system(
     model: Res<GltfModel>,
     assets_gltf: Res<Assets<Gltf>>,
     assets_gltf_meshes: Res<Assets<GltfMesh>>,
-    mut pong_state: ResMut<PongState>,
 ) {
     if asset_server.get_load_state(&model.0) == LoadState::Failed {
         println!("Failed to load gltf.");
@@ -187,12 +177,14 @@ fn stage_load_system(
         let y_from_blender = -8.21107;
         let z_from_blender = 4.66824;
         let scalar = 0.5;
-        commands.spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y),
-            ..default()
-        });
+        commands.spawn_bundle(
+            Camera3dBundle {
+                transform: Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y),
+                ..default()
+            }
+        );
 
-        *pong_state = PongState::InGame;
+        commands.insert_resource(NextState(PongState::InGame));
     }
 }
 
@@ -277,7 +269,6 @@ fn ball_initial_velocity_system(
     for (mut velocity) in ball_query.iter_mut() {
         velocity.0 = Vec4::new(0.0, 0.0, 0.0, *w_velocity);
     }
-    panic!("ball_initial_velocity_system");
 }
 
 fn ball_movement_system(
@@ -340,12 +331,11 @@ mod test_pong_plugin {
         app.add_plugins(MinimalPlugins)
             .add_plugin(AssetPlugin)
             .add_plugin(GltfPlugin)
-            .insert_resource(PongState::LoadingAssets)
             .add_asset::<bevy::pbr::prelude::StandardMaterial>()
             .add_asset::<bevy::render::prelude::Mesh>()
             .add_asset::<bevy::scene::Scene>()
-            .add_startup_system(load_gltf.run_if(in_loading_assets_state))
-            .add_system(stage_load_system.run_if(in_loading_assets_state));
+            .add_startup_system(load_gltf)
+            .add_system(stage_load_system);
 
         app.update();
         assert!(app.world.contains_resource::<GltfModel>());
@@ -378,23 +368,17 @@ mod test_pong_plugin {
         assert!(app.world.contains_resource::<Time>());
         assert!(app.world.contains_resource::<WindowDescriptor>());
         assert!(app.world.contains_resource::<AmbientLight>());
-        assert!(app.world.contains_resource::<PongState>());
         
         app.update();
         assert!(app.world.contains_resource::<GltfModel>());
         std::thread::sleep(std::time::Duration::from_millis(100)); // Allow time for assets to load.
         app.update(); // PongState::LoadingAssets -> PongState::InGame
-        
-        let state = app.world.get_resource::<PongState>().expect("PongState should exist.");
-        assert_eq!(*state, PongState::InGame);
 
         assert_eq!(app.world.query::<&PositionComponent>().iter(&app.world).count(), 3);
         assert_eq!(app.world.query::<&MaterialHandleComponent>().iter(&app.world).count(), 3);
         assert_eq!(app.world.query::<&VelocityComponent>().iter(&app.world).count(), 1);
         assert_eq!(app.world.query::<(&mut VelocityComponent, &BallComponent)>().iter(&app.world).count(), 1);
-        app.update(); // Should run startup systems for PongState::InGame
-        app.update();
-
+        app.update(); // Should run on_entry systems for PongState::InGame
 
         for (velocity) in app.world.query::<&VelocityComponent>().iter(&app.world) {
             assert!(velocity.0.truncate().distance(Vec3::ZERO) < 0.0001);

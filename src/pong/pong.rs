@@ -1,8 +1,10 @@
 use std::vec;
 use rand::{seq::SliceRandom, distributions::Standard};
 
-use bevy::{prelude::*, window::{PresentMode}};
+use bevy::{prelude::*, window::{PresentMode}, gltf::{Gltf, GltfMesh}, asset::LoadState};
+use iyes_loopless::prelude::*;
 
+const GLTF_PATH: &str = "pong.glb";
 const ARENA_LENGTH: f32 = 2.0;
 
 
@@ -24,24 +26,40 @@ impl Plugin for PongPlugin {
                 color: Color::WHITE,
                 brightness: 1.0 / 2.0,
             }
-        ).insert_resource(Time::default())
-        .add_startup_system(stage_load_system)
-        .add_startup_system(ui_load_system)
-        .add_startup_system(ball_initial_velocity_system)
-        .add_system(ball_movement_system)
-        .add_system(render_system);
+        ).insert_resource(PongState::LoadingAssets)
+        .insert_resource(Time::default())
+        .add_startup_system(load_gltf.run_if(in_loading_assets_state))
+        .add_system(stage_load_system.run_if(in_loading_assets_state))
+        .add_startup_system(ui_load_system.run_if(in_game_state))
+        .add_startup_system(ball_initial_velocity_system.run_if(in_game_state))
+        .add_system(ball_movement_system.run_if(in_game_state))
+        .add_system(render_system.run_if(in_game_state));
     }
 }
 
 // Run Conditions
 
+fn in_loading_assets_state(pong_state: Res<PongState>) -> bool {
+    *pong_state == PongState::LoadingAssets
+}
+
+fn in_game_state(pong_state: Res<PongState>) -> bool {
+    *pong_state == PongState::InGame
+}
 
 // End Run Conditions
 
 
 // Resources
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PongState {
+    LoadingAssets,
+    InGame,
+    Paused,
+}
 
+struct GltfModel(Handle<Gltf>);
 
 // End Resources
 
@@ -85,19 +103,41 @@ struct NeedsRenderingComponent;
 
 // Systems
 
-fn stage_load_system(
+fn load_gltf(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-        let scene = asset_server.load("four-dimensional-pong.glb#Scene0");
-        
-        let ball = asset_server.load("four-dimensional-pong.glb#Mesh2");
-        let player_paddle = asset_server.load("four-dimensional-pong.glb#Mesh3");
-        let opponent_paddle = asset_server.load("four-dimensional-pong.glb#Mesh4");
+    let gltf = asset_server.load(GLTF_PATH);
+    if asset_server.get_load_state(gltf.clone()) == LoadState::Failed {
+        println!("Immediately failed to load gltf.");
+    }
 
-        let ball_material = asset_server.load("four-dimensional-pong.glb#Material0");
-        let player_paddle_material = asset_server.load("four-dimensional-pong.glb#Material1");
-        let opponent_paddle_material = asset_server.load("four-dimensional-pong.glb#Material2");
+    commands.insert_resource(GltfModel(gltf));
+}
+
+fn stage_load_system(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    model: Res<GltfModel>,
+    assets_gltf: Res<Assets<Gltf>>,
+    assets_gltf_meshes: Res<Assets<GltfMesh>>,
+    mut pong_state: ResMut<PongState>,
+) {
+    if asset_server.get_load_state(&model.0) == LoadState::Failed {
+        println!("Failed to load gltf.");
+    }
+
+    if let Some(model_root) = assets_gltf.get(&model.0) {
+
+        let scene = model_root.scenes[0].clone();
+        
+        let ball = model_root.meshes[2].clone();
+        let player_paddle = model_root.meshes[3].clone();
+        let opponent_paddle = model_root.meshes[4].clone();
+
+        let ball_material = model_root.named_materials["Ball Material"].clone();
+        let player_paddle_material = model_root.named_materials["Blue Paddle Material"].clone();
+        let opponent_paddle_material = model_root.named_materials["Red Paddle Material"].clone();
         
         commands.spawn_bundle(
             SceneBundle {
@@ -107,9 +147,10 @@ fn stage_load_system(
             }
         );
 
+        
         commands.spawn_bundle(
             PbrBundle {
-                mesh: ball,
+                mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &ball),
                 material: ball_material.clone(),
                 ..Default::default()
             }
@@ -121,7 +162,7 @@ fn stage_load_system(
 
         commands.spawn_bundle(
             PbrBundle {
-                mesh: player_paddle,
+                mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &player_paddle),
                 material: player_paddle_material.clone(),
                 ..Default::default()
             }
@@ -133,7 +174,7 @@ fn stage_load_system(
         
         commands.spawn_bundle(
             PbrBundle {
-                mesh: opponent_paddle,
+                mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &opponent_paddle),
                 material: opponent_paddle_material.clone(),
                 ..Default::default()
             }
@@ -150,6 +191,14 @@ fn stage_load_system(
             transform: Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y),
             ..default()
         });
+
+        *pong_state = PongState::InGame;
+    }
+}
+
+fn get_mesh_from_gltf_or_panic(gltf_mesh_assets: &Res<Assets<GltfMesh>>, gltf_mesh_handle: &Handle<GltfMesh>) -> Handle<Mesh> {
+    let gltf_mesh = gltf_mesh_assets.get(&gltf_mesh_handle).expect("The GLTFMesh should exist.");
+    gltf_mesh.primitives[0].mesh.clone()
 }
 
 fn ui_load_system(
@@ -285,6 +334,27 @@ mod test_pong_plugin {
     use super::*;
 
     #[test]
+    fn test_assets_load() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugin(AssetPlugin)
+            .add_startup_system(load_gltf);
+
+        app.update();
+        std::thread::sleep(std::time::Duration::from_secs(1));
+                
+        app.world.contains_resource::<AssetServer>();
+        let asset_server = app.world.get_resource::<AssetServer>().expect("AssetServer should exist.");
+        app.world.contains_resource::<GltfModel>();
+
+        let model = app.world.get_resource::<GltfModel>();
+        assert!(model.is_some());
+        let model = model.unwrap();
+        assert!(asset_server.get_load_state(model.0.clone()) == LoadState::Loaded);
+        
+    }
+
+    #[test]
     fn test_pong_plugin_initializes() {
         let mut app = App::new();
         app
@@ -292,20 +362,22 @@ mod test_pong_plugin {
             .add_plugin(AssetPlugin)
             .add_plugin(PongPlugin);
 
-        app.update();
-
         app.world.contains_resource::<Time>();
         app.world.contains_resource::<WindowDescriptor>();
         app.world.contains_resource::<AmbientLight>();
+        app.world.contains_resource::<GltfModel>();
+
+        app.update();
+
         assert_eq!(app.world.query::<&PositionComponent>().iter(&app.world).count(), 3);
         assert_eq!(app.world.query::<&MaterialHandleComponent>().iter(&app.world).count(), 3);
         assert_eq!(app.world.query::<&VelocityComponent>().iter(&app.world).count(), 1);
         for (velocity) in app.world.query::<&VelocityComponent>().iter(&app.world) {
-            assert!(velocity.0.truncate().distance(Vec3::new(0.0, 0.0, 0.0)) < 0.0001);
+            assert!(velocity.0.truncate().distance(Vec3::ZERO) < 0.0001);
         }
         for (velocity, _) in app.world.query::<(&VelocityComponent, &BallComponent)>().iter(&app.world) {
             assert!(velocity.0.w == 1.0 || velocity.0.w == -1.0, "Velocity w component should be +1 or -1 but is: {}", velocity.0.w);;
-            assert!(velocity.0.length() == 1.0);
+            assert_eq!(velocity.0.length(), 1.0);
         }
     }
 }

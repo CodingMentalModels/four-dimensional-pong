@@ -329,7 +329,7 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
 
 #[cfg(test)]
 mod test_pong_plugin {
-    use bevy::asset::AssetPlugin;
+    use bevy::{asset::AssetPlugin, gltf::GltfPlugin};
 
     use super::*;
 
@@ -338,11 +338,18 @@ mod test_pong_plugin {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
             .add_plugin(AssetPlugin)
-            .add_startup_system(load_gltf);
+            .add_plugin(GltfPlugin)
+            .insert_resource(PongState::LoadingAssets)
+            .add_asset::<bevy::pbr::prelude::StandardMaterial>()
+            .add_asset::<bevy::render::prelude::Mesh>()
+            .add_asset::<bevy::scene::Scene>()
+            .add_startup_system(load_gltf.run_if(in_loading_assets_state))
+            .add_system(stage_load_system.run_if(in_loading_assets_state));
 
         app.update();
         std::thread::sleep(std::time::Duration::from_secs(1));
-                
+        app.update();
+
         app.world.contains_resource::<AssetServer>();
         let asset_server = app.world.get_resource::<AssetServer>().expect("AssetServer should exist.");
         app.world.contains_resource::<GltfModel>();
@@ -350,6 +357,7 @@ mod test_pong_plugin {
         let model = app.world.get_resource::<GltfModel>();
         assert!(model.is_some());
         let model = model.unwrap();
+        assert!(asset_server.get_load_state(model.0.clone()) != LoadState::Failed);
         assert!(asset_server.get_load_state(model.0.clone()) == LoadState::Loaded);
         
     }

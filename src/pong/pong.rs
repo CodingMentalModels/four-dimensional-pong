@@ -6,6 +6,7 @@ use iyes_loopless::prelude::*;
 
 const GLTF_PATH: &str = "pong.glb";
 const ARENA_LENGTH: f32 = 2.0;
+const PADDLE_STARTING_OFFSET: f32 = 0.5;
 
 
 pub struct PongPlugin;
@@ -121,18 +122,20 @@ fn stage_load_system(
 
         let scene = model_root.scenes[0].clone();
         
+        let arena = model_root.meshes[1].clone();
         let ball = model_root.meshes[2].clone();
         let player_paddle = model_root.meshes[3].clone();
         let opponent_paddle = model_root.meshes[4].clone();
 
+        let arena_material = model_root.named_materials["Material.001"].clone();
         let ball_material = model_root.named_materials["Ball Material"].clone();
         let player_paddle_material = model_root.named_materials["Blue Paddle Material"].clone();
         let opponent_paddle_material = model_root.named_materials["Red Paddle Material"].clone();
         
         commands.spawn_bundle(
-            SceneBundle {
-                scene: scene,
-                transform: Transform::from_xyz(0., 0., 0.),
+            PbrBundle {
+                mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &arena),
+                material: arena_material.clone(),
                 ..Default::default()
             }
         );
@@ -150,14 +153,19 @@ fn stage_load_system(
         .insert(MaterialHandleComponent(ball_material))
         .insert(NeedsRenderingComponent);
 
+        
+        let player_starting_position = Vec4::new(0., 0., -PADDLE_STARTING_OFFSET, -ARENA_LENGTH);
+        let opponent_starting_position = Vec4::new(0., 0., PADDLE_STARTING_OFFSET, ARENA_LENGTH);
+
         commands.spawn_bundle(
             PbrBundle {
                 mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &player_paddle),
                 material: player_paddle_material.clone(),
+                transform: Transform::from_translation(player_starting_position.truncate()),
                 ..Default::default()
             }
         ).insert(PaddleComponent)
-        .insert(PositionComponent(Vec4::new(0., 0., 0., -ARENA_LENGTH)))
+        .insert(PositionComponent(player_starting_position))
         .insert(MaterialHandleComponent(player_paddle_material))
         .insert(NeedsRenderingComponent);
 
@@ -166,10 +174,11 @@ fn stage_load_system(
             PbrBundle {
                 mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &opponent_paddle),
                 material: opponent_paddle_material.clone(),
+                transform: Transform::from_translation(opponent_starting_position.truncate()),
                 ..Default::default()
             }
         ).insert(PaddleComponent)
-        .insert(PositionComponent(Vec4::new(0., 0., 0., ARENA_LENGTH)))
+        .insert(PositionComponent(opponent_starting_position))
         .insert(MaterialHandleComponent(opponent_paddle_material))
         .insert(NeedsRenderingComponent);
 
@@ -350,6 +359,7 @@ mod test_pong_plugin {
         let model = model.unwrap();
         assert!(asset_server.get_load_state(model.0.clone()) != LoadState::Failed);
         assert!(asset_server.get_load_state(model.0.clone()) == LoadState::Loaded);
+        assert_eq!(app.world.entities().len(), 5);
         
     }
 

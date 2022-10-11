@@ -26,14 +26,15 @@ impl Plugin for PongPlugin {
                 color: Color::WHITE,
                 brightness: 1.0 / 2.0,
             }
-        ).insert_resource(PongState::LoadingAssets)
-        .insert_resource(Time::default())
-        .add_startup_system(load_gltf.run_if(in_loading_assets_state))
-        .add_system(stage_load_system.run_if(in_loading_assets_state))
-        .add_startup_system(ui_load_system.run_if(in_game_state))
-        .add_startup_system(ball_initial_velocity_system.run_if(in_game_state))
-        .add_system(ball_movement_system.run_if(in_game_state))
-        .add_system(render_system.run_if(in_game_state));
+        ).insert_resource(Time::default())
+        .insert_resource(PongState::LoadingAssets)
+        .add_loopless_state(PongState::LoadingAssets)
+        .add_startup_system(load_gltf)
+        .add_system(stage_load_system.run_in_state(PongState::LoadingAssets))
+        .add_enter_system(PongState::InGame, ui_load_system)
+        .add_enter_system(PongState::InGame, ball_initial_velocity_system)
+        .add_system(ball_movement_system.run_in_state(PongState::InGame))
+        .add_system(render_system.run_in_state(PongState::InGame));
     }
 }
 
@@ -52,7 +53,7 @@ fn in_game_state(pong_state: Res<PongState>) -> bool {
 
 // Resources
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum PongState {
     LoadingAssets,
     InGame,
@@ -111,7 +112,6 @@ fn load_gltf(
     if asset_server.get_load_state(gltf.clone()) == LoadState::Failed {
         println!("Immediately failed to load gltf.");
     }
-
     commands.insert_resource(GltfModel(gltf));
 }
 
@@ -270,13 +270,14 @@ fn get_text_bundle(
 }
 
 fn ball_initial_velocity_system(
-    mut ball_query: Query<(&mut VelocityComponent, &BallComponent)>,
+    mut ball_query: Query<(&mut VelocityComponent), With<BallComponent>>,
 ) {
     let directions = vec![-1., 1.];
     let w_velocity = directions.choose(&mut rand::thread_rng()).expect("Directions is never empty.");
-    for (mut velocity, ball) in ball_query.iter_mut() {
+    for (mut velocity) in ball_query.iter_mut() {
         velocity.0 = Vec4::new(0.0, 0.0, 0.0, *w_velocity);
     }
+    panic!("ball_initial_velocity_system");
 }
 
 fn ball_movement_system(
@@ -347,12 +348,12 @@ mod test_pong_plugin {
             .add_system(stage_load_system.run_if(in_loading_assets_state));
 
         app.update();
+        assert!(app.world.contains_resource::<GltfModel>());
         std::thread::sleep(std::time::Duration::from_millis(100));
         app.update();
 
-        app.world.contains_resource::<AssetServer>();
+        assert!(app.world.contains_resource::<AssetServer>());
         let asset_server = app.world.get_resource::<AssetServer>().expect("AssetServer should exist.");
-        app.world.contains_resource::<GltfModel>();
 
         let model = app.world.get_resource::<GltfModel>();
         assert!(model.is_some());
@@ -374,18 +375,27 @@ mod test_pong_plugin {
             .add_asset::<bevy::render::prelude::Mesh>()
             .add_asset::<bevy::scene::Scene>();
 
-        app.world.contains_resource::<Time>();
-        app.world.contains_resource::<WindowDescriptor>();
-        app.world.contains_resource::<AmbientLight>();
-        app.world.contains_resource::<GltfModel>();
-
+        assert!(app.world.contains_resource::<Time>());
+        assert!(app.world.contains_resource::<WindowDescriptor>());
+        assert!(app.world.contains_resource::<AmbientLight>());
+        assert!(app.world.contains_resource::<PongState>());
+        
         app.update();
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        app.update();
+        assert!(app.world.contains_resource::<GltfModel>());
+        std::thread::sleep(std::time::Duration::from_millis(100)); // Allow time for assets to load.
+        app.update(); // PongState::LoadingAssets -> PongState::InGame
+        
+        let state = app.world.get_resource::<PongState>().expect("PongState should exist.");
+        assert_eq!(*state, PongState::InGame);
 
         assert_eq!(app.world.query::<&PositionComponent>().iter(&app.world).count(), 3);
         assert_eq!(app.world.query::<&MaterialHandleComponent>().iter(&app.world).count(), 3);
         assert_eq!(app.world.query::<&VelocityComponent>().iter(&app.world).count(), 1);
+        assert_eq!(app.world.query::<(&mut VelocityComponent, &BallComponent)>().iter(&app.world).count(), 1);
+        app.update(); // Should run startup systems for PongState::InGame
+        app.update();
+
+
         for (velocity) in app.world.query::<&VelocityComponent>().iter(&app.world) {
             assert!(velocity.0.truncate().distance(Vec3::ZERO) < 0.0001);
         }

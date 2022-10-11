@@ -347,7 +347,7 @@ mod test_pong_plugin {
             .add_system(stage_load_system.run_if(in_loading_assets_state));
 
         app.update();
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        std::thread::sleep(std::time::Duration::from_millis(100));
         app.update();
 
         app.world.contains_resource::<AssetServer>();
@@ -368,13 +368,19 @@ mod test_pong_plugin {
         app
             .add_plugins(MinimalPlugins)
             .add_plugin(AssetPlugin)
-            .add_plugin(PongPlugin);
+            .add_plugin(GltfPlugin)
+            .add_plugin(PongPlugin)
+            .add_asset::<bevy::pbr::prelude::StandardMaterial>()
+            .add_asset::<bevy::render::prelude::Mesh>()
+            .add_asset::<bevy::scene::Scene>();
 
         app.world.contains_resource::<Time>();
         app.world.contains_resource::<WindowDescriptor>();
         app.world.contains_resource::<AmbientLight>();
         app.world.contains_resource::<GltfModel>();
 
+        app.update();
+        std::thread::sleep(std::time::Duration::from_millis(100));
         app.update();
 
         assert_eq!(app.world.query::<&PositionComponent>().iter(&app.world).count(), 3);

@@ -111,24 +111,6 @@ fn load_gltf(
     if asset_server.get_load_state(gltf.clone()) == LoadState::Failed {
         println!("Immediately failed to load gltf.");
     }
-    // let mut loading = true;
-    // let mut timer = 0;
-    // while loading {
-    //     match asset_server.get_load_state(gltf.clone()) {
-    //         LoadState::Loaded => {
-    //             loading = false;
-    //         }
-    //         LoadState::Failed => {
-    //             panic!("Failed to load gltf after {} ms", timer);
-    //         }
-    //         _ => {}
-    //     }
-    //     std::thread::sleep(std::time::Duration::from_millis(10));
-    //     timer += 10;
-    //     if timer > 10000 {
-    //         panic!("Timed out loading gltf after {} ms with state {:?}", timer, asset_server.get_load_state(gltf.clone()));
-    //     }
-    // }
 
     commands.insert_resource(GltfModel(gltf));
 }

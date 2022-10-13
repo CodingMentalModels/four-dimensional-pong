@@ -119,8 +119,6 @@ fn stage_load_system(
     }
 
     if let Some(model_root) = assets_gltf.get(&model.0) {
-
-        let scene = model_root.scenes[0].clone();
         
         let arena = model_root.meshes[1].clone();
         let ball = model_root.meshes[2].clone();

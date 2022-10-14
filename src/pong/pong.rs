@@ -8,8 +8,12 @@ use crate::pong::player::Player;
 
 const GLTF_PATH: &str = "pong.glb";
 const ARENA_LENGTH: f32 = 5.0;
+const ARENA_WIDTH: f32 = 2.0;
 const PADDLE_STARTING_OFFSET: f32 = 0.5;
 const GOAL_OFFSET_FROM_ARENA: f32 = 0.1;
+const PADDLE_SPEED: f32 = 2.0;
+const PADDLE_WIDTH: f32 = 0.1;
+const BALL_RADIUS: f32 = 0.03;
 
 
 pub struct PongPlugin;
@@ -31,13 +35,15 @@ impl Plugin for PongPlugin {
                 brightness: 1.0 / 2.0,
             }
         ).insert_resource(Time::default())
+        .insert_resource(Input::<KeyCode>::default())
         .add_event::<ScoreEvent>()
         .add_loopless_state(PongState::LoadingAssets)
         .add_startup_system(load_gltf)
         .add_system(stage_load_system.run_in_state(PongState::LoadingAssets))
         .add_enter_system(PongState::InGame, ui_load_system)
         .add_enter_system(PongState::InGame, ball_initial_velocity_system)
-        .add_system(ball_movement_system.run_in_state(PongState::InGame))
+        .add_system(input_system.run_in_state(PongState::InGame))
+        .add_system(movement_system.run_in_state(PongState::InGame))
         .add_system(collision_system.run_in_state(PongState::InGame))
         .add_system(render_system.run_in_state(PongState::InGame))
         .add_system(score_system.run_in_state(PongState::InGame));
@@ -74,14 +80,16 @@ struct ScoreEvent(Player);
 // Components
 
 #[derive(Component)]
+struct PlayerInputComponent;
+
+#[derive(Component)]
 struct BallComponent;
 
 #[derive(Component)]
-struct PaddleComponent;
+struct PaddleComponent(Player);
 
 #[derive(Component)]
 struct GoalComponent;
-
 
 #[derive(Component)]
 struct WallComponent;
@@ -99,10 +107,7 @@ struct MaterialHandleComponent(Handle<StandardMaterial>);
 struct NeedsRenderingComponent;
 
 #[derive(Component)]
-struct PlayerScoreComponent;
-
-#[derive(Component)]
-struct OpponentScoreComponent;
+struct ScoreComponent(Player, usize);
 
 // End Components
 
@@ -175,10 +180,12 @@ fn stage_load_system(
                 transform: Transform::from_translation(player_starting_position.truncate()),
                 ..Default::default()
             }
-        ).insert(PaddleComponent)
+        ).insert(PaddleComponent(Player::Blue))
         .insert(PositionComponent(player_starting_position))
+        .insert(VelocityComponent(Vec4::ZERO))
         .insert(MaterialHandleComponent(player_paddle_material))
-        .insert(NeedsRenderingComponent);
+        .insert(NeedsRenderingComponent)
+        .insert(PlayerInputComponent);
 
         
         commands.spawn_bundle(
@@ -188,8 +195,9 @@ fn stage_load_system(
                 transform: Transform::from_translation(opponent_starting_position.truncate()),
                 ..Default::default()
             }
-        ).insert(PaddleComponent)
+        ).insert(PaddleComponent(Player::Red))
         .insert(PositionComponent(opponent_starting_position))
+        .insert(VelocityComponent(Vec4::ZERO))
         .insert(MaterialHandleComponent(opponent_paddle_material))
         .insert(NeedsRenderingComponent);
 
@@ -218,11 +226,6 @@ fn ui_load_system(
     asset_server: Res<AssetServer>,
 ) {
     let font = asset_server.load("fonts/Roboto-Regular.ttf");
-    let text_style = TextStyle {
-        font: font.clone(),
-        font_size: 40.0,
-        color: Color::WHITE,
-    };
     commands.spawn_bundle(
         NodeBundle {
             style: Style {
@@ -240,24 +243,24 @@ fn ui_load_system(
             parent.spawn_bundle(
                 get_text_bundle(
                     "0",
-                    text_style.clone(),
+                    get_text_style(font.clone(), Color::BLUE),
                     JustifyContent::SpaceBetween,
                 )
-            ).insert(PlayerScoreComponent);
+            ).insert(ScoreComponent(Player::Blue, 0));
             parent.spawn_bundle(
                 get_text_bundle(
                     "4D Pong",
-                    text_style.clone(),
+                    get_text_style(font.clone(), Color::WHITE),
                     JustifyContent::SpaceBetween,
                 )
             );
             parent.spawn_bundle(
                 get_text_bundle(
                     "0",
-                    text_style.clone(),
+                    get_text_style(font, Color::RED),
                     JustifyContent::SpaceBetween,
                 )
-            ).insert(OpponentScoreComponent);
+            ).insert(ScoreComponent(Player::Red, 0));
         }
     );
 }
@@ -281,6 +284,14 @@ fn get_text_bundle(
     )
 }
 
+fn get_text_style(font: Handle<Font>, color: Color) -> TextStyle {
+    TextStyle {
+        font: font,
+        font_size: 50.0,
+        color: color,
+    }
+}
+
 fn ball_initial_velocity_system(
     mut ball_query: Query<(&mut VelocityComponent), With<BallComponent>>,
 ) {
@@ -289,13 +300,71 @@ fn ball_initial_velocity_system(
     }
 }
 
-fn ball_movement_system(
+fn input_system(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut paddle_query: Query<&mut VelocityComponent, With<PlayerInputComponent>>,
+) {
+    for (mut velocity) in paddle_query.iter_mut() {
+        if keyboard_input.just_pressed(KeyCode::W) {
+            velocity.0 += PADDLE_SPEED*Vec4::new(0., 0., 1., 0.);
+        }
+        if keyboard_input.just_pressed(KeyCode::S) {
+            velocity.0 += PADDLE_SPEED*Vec4::new(0., 0., -1., 0.);
+        }
+        if keyboard_input.just_pressed(KeyCode::A) {
+            velocity.0 += PADDLE_SPEED*Vec4::new(-1., 0., 0., 0.);
+        }
+        if keyboard_input.just_pressed(KeyCode::D) {
+            velocity.0 += PADDLE_SPEED*Vec4::new(1., 0., 0., 0.);
+        }
+        if keyboard_input.just_pressed(KeyCode::Up) {
+            velocity.0 += PADDLE_SPEED*Vec4::new(0., 1., 0., 0.);
+        }
+        if keyboard_input.just_pressed(KeyCode::Down) {
+            velocity.0 += PADDLE_SPEED*Vec4::new(0., -1., 0., 0.);
+        }
+
+        
+        if keyboard_input.just_released(KeyCode::W) {
+            velocity.0 -= PADDLE_SPEED*Vec4::new(0., 0., 1., 0.);
+        }
+        if keyboard_input.just_released(KeyCode::S) {
+            velocity.0 -= PADDLE_SPEED*Vec4::new(0., 0., -1., 0.);
+        }
+        if keyboard_input.just_released(KeyCode::A) {
+            velocity.0 -= PADDLE_SPEED*Vec4::new(-1., 0., 0., 0.);
+        }
+        if keyboard_input.just_released(KeyCode::D) {
+            velocity.0 -= PADDLE_SPEED*Vec4::new(1., 0., 0., 0.);
+        }
+        if keyboard_input.just_released(KeyCode::Up) {
+            velocity.0 -= PADDLE_SPEED*Vec4::new(0., 1., 0., 0.);
+        }
+        if keyboard_input.just_released(KeyCode::Down) {
+            velocity.0 -= PADDLE_SPEED*Vec4::new(0., -1., 0., 0.);
+        }
+    }
+}
+
+fn movement_system(
     time: Res<Time>,
-    mut ball_query: Query<(&mut PositionComponent, &VelocityComponent), With<BallComponent>>,
+    mut ball_query: Query<(&mut PositionComponent, &VelocityComponent)>,
 ) {
     for (mut position, velocity) in ball_query.iter_mut() {
         position.0 += velocity.0 * time.delta_seconds();
     }
+}
+
+fn clamp_3d(
+    position: Vec4,
+    min: Vec3,
+    max: Vec3,
+) -> Vec4 {
+    let mut to_return = position;
+    to_return.x = to_return.x.clamp(min.x, max.x);
+    to_return.y = to_return.y.clamp(min.y, max.y);
+    to_return.z = to_return.z.clamp(min.z, max.z);
+    return to_return;
 }
 
 fn collision_system(
@@ -316,15 +385,84 @@ fn collision_system(
             }
         }
         for (mut paddle_position, paddle) in paddle_query.iter_mut() {
-            // if ball_position.0.w > paddle_position.0.w {
-            //     if ball_position.0.x > paddle_position.0.x - PADDLE_WIDTH/2. && ball_position.0.x < paddle_position.0.x + PADDLE_WIDTH/2. {
-            //         if ball_position.0.y > paddle_position.0.y - PADDLE_HEIGHT/2. && ball_position.0.y < paddle_position.0.y + PADDLE_HEIGHT/2. {
-            //             ball_velocity.0.w *= -1.;
-            //         }
-            //     }
-            // }
+            let paddle_player = paddle.0;
+            let paddle_front_w = paddle_position.0.w + PADDLE_WIDTH/2.0;
+            
+            let is_at_or_beyond_paddle = match paddle_player {
+                Player::Blue => (ball_position.0.w - BALL_RADIUS) <= -paddle_front_w,
+                Player::Red => (ball_position.0.w + BALL_RADIUS) >= paddle_front_w,
+            };
+
+            if is_at_or_beyond_paddle {
+                match get_ball_paddle_collision(ball_position.0, paddle_position.0) {
+                    Some(normal) => {
+                        ball_velocity.0 = reflect(ball_velocity.0, normal);
+                    },
+                    None => {
+                        // Do nothing
+                    }
+                }
+            }
         }
     }
+    for (mut paddle_position, paddle) in paddle_query.iter_mut() {
+        let clamp_distance = ARENA_WIDTH/2. - PADDLE_WIDTH/2.;
+        paddle_position.0 = clamp_3d(
+            paddle_position.0, 
+            -clamp_distance*Vec3::ONE,
+            clamp_distance*Vec3::ONE,
+        );
+    }
+}
+
+fn reflect(vector: Vec4, normal: Vec4) -> Vec4 {
+    let dot = vector.dot(normal);
+    let twice_dot = 2. * dot;
+    let twice_dot_times_normal = twice_dot * normal;
+    let reflected = vector - twice_dot_times_normal;
+    return reflected;
+}
+
+fn get_ball_paddle_collision(ball_position: Vec4, paddle_position: Vec4) -> Option<Vec4> {
+    let ball_radius = BALL_RADIUS;
+    let paddle_radius = PADDLE_WIDTH/2.;
+
+    let ball_paddle_distance_x = (ball_position.x - paddle_position.x).abs();
+    let ball_paddle_distance_y = (ball_position.y - paddle_position.y).abs();
+    let ball_paddle_distance_z = (ball_position.z - paddle_position.z).abs();
+
+    let is_x_collision = ball_paddle_distance_x <= ball_radius + paddle_radius;
+    let is_y_collision = ball_paddle_distance_y <= ball_radius + paddle_radius;
+    let is_z_collision = ball_paddle_distance_z <= ball_radius + paddle_radius;
+
+    if is_x_collision && is_y_collision && is_z_collision {
+        let normal = get_ball_paddle_collision_normal(ball_position, paddle_position);
+        return Some(normal);
+    } else {
+        return None;
+    }
+}
+
+fn get_ball_paddle_collision_normal(ball_position: Vec4, paddle_position: Vec4) -> Vec4 {
+    let ball_paddle_distance = ball_position - paddle_position;
+    let potential_normals = vec![
+        Vec4::new(1., 0., 0., 0.),
+        Vec4::new(-1., 0., 0., 0.),
+        Vec4::new(0., 1., 0., 0.),
+        Vec4::new(0., -1., 0., 0.),
+        Vec4::new(0., 0., 1., 0.),
+        Vec4::new(0., 0., -1., 0.),
+    ];
+    let mut to_return = Vec4::ZERO;
+    let mut max_similarity = -999.0;
+    for normal in potential_normals {
+        let similarity = ball_paddle_distance.dot(normal);
+        if similarity > max_similarity {
+            max_similarity = ball_paddle_distance.dot(normal);
+            to_return = normal;
+        }
+    }
+    return to_return;
 }
 
 fn render_system(
@@ -346,20 +484,13 @@ fn render_system(
 
 fn score_system(
     mut score_event_reader: EventReader<ScoreEvent>,
-    mut player_score_query: Query<&mut Text, (With<PlayerScoreComponent>, Without<OpponentScoreComponent>)>,
-    mut opponent_score_query: Query<&mut Text, (With<OpponentScoreComponent>, Without<PlayerScoreComponent>)>,
+    mut score_query: Query<(&mut Text, &mut ScoreComponent)>,
 ) {
     for score_event in score_event_reader.iter() {
-        match score_event.0 {
-            Player::Blue => {
-                for mut text in player_score_query.iter_mut() {
-                    text.sections[0].value = (text.sections[0].value.parse::<u32>().unwrap() + 1).to_string();
-                }
-            },
-            Player::Red => {
-                for mut text in opponent_score_query.iter_mut() {
-                    text.sections[0].value = (text.sections[0].value.parse::<u32>().unwrap() + 1).to_string();
-                }
+        for (mut text, mut score_component) in score_query.iter_mut() {
+            if score_event.0 == score_component.0 {
+                score_component.1 += 1;
+                text.sections[0].value = (text.sections[0].value.parse::<u32>().unwrap() + 1).to_string();
             }
         }
     }
@@ -474,7 +605,7 @@ mod test_pong_plugin {
         
         assert_eq!(app.world.query::<&PositionComponent>().iter(&app.world).count(), 3);
         assert_eq!(app.world.query::<&MaterialHandleComponent>().iter(&app.world).count(), 3);
-        assert_eq!(app.world.query::<&VelocityComponent>().iter(&app.world).count(), 1);
+        assert_eq!(app.world.query::<&VelocityComponent>().iter(&app.world).count(), 3);
         assert_eq!(app.world.query::<(&mut VelocityComponent, &BallComponent)>().iter(&app.world).count(), 1);
         app.update(); // Should run on_entry systems for PongState::InGame
 
@@ -488,7 +619,7 @@ mod test_pong_plugin {
     }
 
     #[test]
-    fn test_collision_system() {
+    fn test_can_score_goal() {
         let mut app = initialize_pong_plugin_and_load_assets();
 
         let new_ball_position = Vec4::new(0.0, 0.0, 0.0, (ARENA_LENGTH + GOAL_OFFSET_FROM_ARENA - 0.0001)/2.);
@@ -513,6 +644,64 @@ mod test_pong_plugin {
             assert_eq!(velocity.0.length(), 1.0);
         }
 
+        let mut score_query = app.world.query::<&ScoreComponent>();
+        for score_component in score_query.iter(&app.world) {
+            let (player, score) = (score_component.0, score_component.1);
+            if player == Player::Blue {
+                assert_eq!(score, 1);
+            } else {
+                assert_eq!(score, 0);
+            }
+        }
+
+    }
+
+    #[test]
+    fn test_input_handling() {
+        let mut app = initialize_pong_plugin_and_load_assets();
+
+        app.world.resource_mut::<Input<KeyCode>>().press(KeyCode::W);
+        app.update();
+        app.update();
+
+        let mut paddle_query = app.world.query::<(&mut PositionComponent, &PaddleComponent)>();
+        for (mut position, paddle) in paddle_query.iter_mut(&mut app.world) {
+            if paddle.0 == Player::Blue {
+                assert!(position.0.z > 0.0);
+                assert!(position.0.z <= ARENA_LENGTH/2.);
+            } else {
+                assert_eq!(position.0.y, 0.0);
+            }
+        }
+
+        app.world.resource_mut::<Input<KeyCode>>().press(KeyCode::D);
+        app.update();
+        app.update();
+
+        let mut paddle_query = app.world.query::<(&mut PositionComponent, &PaddleComponent)>();
+        for (mut position, paddle) in paddle_query.iter_mut(&mut app.world) {
+            if paddle.0 == Player::Blue {
+                assert!(position.0.z > 0.0 && position.0.z <= ARENA_LENGTH/2.);
+                assert!(position.0.x > 0.0 && position.0.x <= ARENA_LENGTH/2.);
+            } else {
+                assert_eq!(position.0.y, 0.0);
+            }
+        }
+
+        app.world.resource_mut::<Input<KeyCode>>().press(KeyCode::Up);
+        app.update();
+        app.update();
+
+        let mut paddle_query = app.world.query::<(&mut PositionComponent, &PaddleComponent)>();
+        for (mut position, paddle) in paddle_query.iter_mut(&mut app.world) {
+            if paddle.0 == Player::Blue {
+                assert!(position.0.z > 0.0 && position.0.z <= ARENA_LENGTH/2.);
+                assert!(position.0.x > 0.0 && position.0.x <= ARENA_LENGTH/2.);
+                assert!(position.0.y > 0.0 && position.0.y <= ARENA_LENGTH/2.);
+            } else {
+                assert_eq!(position.0.y, 0.0);
+            }
+        }
     }
 
     #[test]

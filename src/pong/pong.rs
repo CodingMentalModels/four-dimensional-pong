@@ -4,6 +4,8 @@ use rand::{seq::SliceRandom, distributions::Standard};
 use bevy::{prelude::*, window::{PresentMode}, gltf::{Gltf, GltfMesh}, asset::LoadState};
 use iyes_loopless::prelude::*;
 
+use crate::pong::components::*;
+use crate::pong::resources::*;
 use crate::pong::player::Player;
 
 const GLTF_PATH: &str = "pong.glb";
@@ -22,14 +24,6 @@ impl Plugin for PongPlugin {
     fn build(&self, app: &mut App) {
         app
         .insert_resource(
-            WindowDescriptor {
-            title: "4D Pong".to_string(),
-            width: 500.,
-            height: 500.,
-            present_mode: PresentMode::Fifo,
-            ..default()
-            }
-        ).insert_resource(
             AmbientLight {
                 color: Color::WHITE,
                 brightness: 1.0 / 2.0,
@@ -37,10 +31,8 @@ impl Plugin for PongPlugin {
         ).insert_resource(Time::default())
         .insert_resource(Input::<KeyCode>::default())
         .add_event::<ScoreEvent>()
-        .add_loopless_state(PongState::LoadingAssets)
         .add_startup_system(load_gltf)
         .add_system(stage_load_system.run_in_state(PongState::LoadingAssets))
-        .add_enter_system(PongState::InGame, ui_load_system)
         .add_enter_system(PongState::InGame, ball_initial_velocity_system)
         .add_system(input_system.run_in_state(PongState::InGame))
         .add_system(movement_system.run_in_state(PongState::InGame))
@@ -57,13 +49,6 @@ impl Plugin for PongPlugin {
 
 // Resources
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum PongState {
-    LoadingAssets,
-    InGame,
-    Paused,
-}
-
 struct GltfModel(Handle<Gltf>);
 
 // End Resources
@@ -75,42 +60,6 @@ struct GltfModel(Handle<Gltf>);
 struct ScoreEvent(Player);
 
 // End Events
-
-
-// Components
-
-#[derive(Component)]
-struct PlayerInputComponent;
-
-#[derive(Component)]
-struct BallComponent;
-
-#[derive(Component)]
-struct PaddleComponent(Player);
-
-#[derive(Component)]
-struct GoalComponent;
-
-#[derive(Component)]
-struct WallComponent;
-
-#[derive(Component)]
-struct PositionComponent(Vec4);
-
-#[derive(Component)]
-struct VelocityComponent(Vec4);
-
-#[derive(Component)]
-struct MaterialHandleComponent(Handle<StandardMaterial>);
-
-#[derive(Component)]
-struct NeedsRenderingComponent;
-
-#[derive(Component)]
-struct ScoreComponent(Player, usize);
-
-// End Components
-
 
 // Systems
 
@@ -219,77 +168,6 @@ fn stage_load_system(
 fn get_mesh_from_gltf_or_panic(gltf_mesh_assets: &Res<Assets<GltfMesh>>, gltf_mesh_handle: &Handle<GltfMesh>) -> Handle<Mesh> {
     let gltf_mesh = gltf_mesh_assets.get(&gltf_mesh_handle).expect("The GLTFMesh should exist.");
     gltf_mesh.primitives[0].mesh.clone()
-}
-
-fn ui_load_system(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
-    let font = asset_server.load("fonts/Roboto-Regular.ttf");
-    commands.spawn_bundle(
-        NodeBundle {
-            style: Style {
-                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
-                position_type: PositionType::Absolute,
-                justify_content: JustifyContent::SpaceBetween,
-                align_items: AlignItems::FlexEnd,
-                ..Default::default()
-            },
-            color: Color::NONE.into(),
-            ..Default::default()
-        }
-    ).with_children(
-        |parent| {
-            parent.spawn_bundle(
-                get_text_bundle(
-                    "0",
-                    get_text_style(font.clone(), Color::BLUE),
-                    JustifyContent::SpaceBetween,
-                )
-            ).insert(ScoreComponent(Player::Blue, 0));
-            parent.spawn_bundle(
-                get_text_bundle(
-                    "4D Pong",
-                    get_text_style(font.clone(), Color::WHITE),
-                    JustifyContent::SpaceBetween,
-                )
-            );
-            parent.spawn_bundle(
-                get_text_bundle(
-                    "0",
-                    get_text_style(font, Color::RED),
-                    JustifyContent::SpaceBetween,
-                )
-            ).insert(ScoreComponent(Player::Red, 0));
-        }
-    );
-}
-
-fn get_text_bundle(
-    text: &str,
-    text_style: TextStyle,
-    justify_content: JustifyContent,
-) -> TextBundle {
-    TextBundle::from_section(
-        text.to_string(),
-        text_style
-    ).with_text_alignment(TextAlignment::TOP_CENTER)
-    .with_style(
-        Style {
-            align_self: AlignSelf::FlexEnd,
-            justify_content: justify_content,
-            margin: UiRect::all(Val::Px(25.0)),
-            ..Default::default()
-        }
-    )
-}
-
-fn get_text_style(font: Handle<Font>, color: Color) -> TextStyle {
-    TextStyle {
-        font: font,
-        font_size: 50.0,
-        color: color,
-    }
 }
 
 fn ball_initial_velocity_system(
@@ -527,6 +405,7 @@ mod test_pong_plugin {
             .add_plugins(MinimalPlugins)
             .add_plugin(AssetPlugin)
             .add_plugin(GltfPlugin)
+            .add_loopless_state(PongState::LoadingAssets)
             .add_plugin(PongPlugin)
             .add_asset::<bevy::pbr::prelude::StandardMaterial>()
             .add_asset::<bevy::render::prelude::Mesh>()
@@ -575,7 +454,6 @@ mod test_pong_plugin {
         let mut app = initialize_pong_plugin_and_load_assets();
         
         assert!(app.world.contains_resource::<Time>());
-        assert!(app.world.contains_resource::<WindowDescriptor>());
         assert!(app.world.contains_resource::<AmbientLight>());
         
         assert_eq!(app.world.query::<&PositionComponent>().iter(&app.world).count(), 3);

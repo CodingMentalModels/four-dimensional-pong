@@ -1,7 +1,7 @@
 use std::vec;
 use rand::{seq::SliceRandom, distributions::Standard};
 
-use bevy::{prelude::*, window::{PresentMode}, gltf::{Gltf, GltfMesh}, asset::LoadState};
+use bevy::{prelude::*, window::{PresentMode}, gltf::{Gltf, GltfMesh}, asset::LoadState, render::camera::RenderTarget};
 use iyes_loopless::prelude::*;
 
 use crate::pong::components::*;
@@ -31,7 +31,8 @@ impl Plugin for PongPlugin {
         ).insert_resource(Time::default())
         .insert_resource(Input::<KeyCode>::default())
         .add_event::<ScoreEvent>()
-        .add_startup_system(load_gltf)
+        .add_enter_system(PongState::LoadingAssets, load_gltf)
+        .add_enter_system(PongState::LoadingAssets, load_projection_images)
         .add_system(stage_load_system.run_in_state(PongState::LoadingAssets))
         .add_enter_system(PongState::InGame, ball_initial_velocity_system)
         .add_system(input_system.run_in_state(PongState::InGame))
@@ -74,19 +75,33 @@ fn load_gltf(
     commands.insert_resource(GltfModel(gltf));
 }
 
+fn load_projection_images(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    let projection_images = ProjectionImages::new(
+        asset_server.load("projection_xw.png"),
+        asset_server.load("projection_yw.png"),
+        asset_server.load("projection_zw.png"),
+    );
+
+    commands.insert_resource(projection_images);
+
+}
+
 fn stage_load_system(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     model: Res<GltfModel>,
     assets_gltf: Res<Assets<Gltf>>,
     assets_gltf_meshes: Res<Assets<GltfMesh>>,
+    projection_image_handles: Res<ProjectionImages>,
 ) {
     if asset_server.get_load_state(&model.0) == LoadState::Failed {
         println!("Failed to load gltf.");
     }
 
     if let Some(model_root) = assets_gltf.get(&model.0) {
-        
         let arena = model_root.meshes[1].clone();
         let ball = model_root.meshes[2].clone();
         let player_paddle = model_root.meshes[3].clone();
@@ -161,7 +176,20 @@ fn stage_load_system(
             }
         );
 
-        commands.insert_resource(NextState(PongState::InGame));
+        let (xw_image, yw_image, zw_image) = projection_image_handles.unpack();
+
+        commands.spawn_bundle(
+            Camera3dBundle {
+                transform: Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y),
+                camera: Camera {
+                    target: RenderTarget::Image(xw_image),
+                    ..default()
+                },
+                ..default()
+            }
+        );
+
+        commands.insert_resource(NextState(PongState::SettingUpUI));
     }
 }
 

@@ -10,7 +10,7 @@ use crate::pong::resources::*;
 fn main() {
     App::new()    
         .add_plugins(DefaultPlugins)
-        .add_loopless_state(PongState::SettingUpUI)
+        .add_loopless_state(PongState::LoadingAssets)
         .add_plugin(UIPlugin)
         .add_plugin(PongPlugin)
         .run();

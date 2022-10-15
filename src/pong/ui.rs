@@ -1,5 +1,6 @@
 use bevy::{prelude::*, window::PresentMode};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
+use egui::TextureHandle;
 use iyes_loopless::prelude::*;
 
 use crate::pong::components::*;
@@ -25,7 +26,6 @@ fn configure_visuals(mut egui_ctx: ResMut<EguiContext>) {
         ..Default::default()
     });
 }
-
 
 fn ui_load_system(
     mut commands: Commands,
@@ -71,12 +71,13 @@ fn ui_load_system(
         }
     );
 
-    commands.insert_resource(NextState(PongState::LoadingAssets));
+    commands.insert_resource(NextState(PongState::InGame));
 
 }
 
 fn ui_system(
     mut egui_ctx: ResMut<EguiContext>,
+    mut projection_images: Res<ProjectionImages>,
 ) {
     
     egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx_mut(), |ui| {
@@ -86,8 +87,22 @@ fn ui_system(
                     std::process::exit(0);
                 }
             });
+            egui::menu::menu_button(ui, "About", |ui| {
+                ui.label("https://www.twitch.tv/codingmentalmodels");
+            });
         });
     });
+
+    let (xw_image, yw_image, zw_image) = projection_images.unpack();
+
+    let texture = egui_ctx.add_image(xw_image.clone());
+    egui::Area::new("xw-projection")
+        .anchor(egui::Align2::LEFT_BOTTOM, egui::Vec2::ZERO)
+        .show(
+            egui_ctx.ctx_mut(), |ui| {
+                ui.image(texture, egui::vec2(200.0, 200.0));
+            }
+        );
 }
 
 // End Systems

@@ -355,18 +355,6 @@ fn movement_system(
     }
 }
 
-fn clamp_3d(
-    position: Vec4,
-    min: Vec3,
-    max: Vec3,
-) -> Vec4 {
-    let mut to_return = position;
-    to_return.x = to_return.x.clamp(min.x, max.x);
-    to_return.y = to_return.y.clamp(min.y, max.y);
-    to_return.z = to_return.z.clamp(min.z, max.z);
-    return to_return;
-}
-
 fn collision_system(
     mut ball_query: Query<(&mut PositionComponent, &mut VelocityComponent), With<BallComponent>>,
     mut paddle_query: Query<(&mut PositionComponent, &PaddleComponent), Without<BallComponent>>,
@@ -511,6 +499,18 @@ fn get_color_from_w(w: f32, arena_length: f32) -> Color {
 
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
+}
+
+fn clamp_3d(
+    position: Vec4,
+    min: Vec3,
+    max: Vec3,
+) -> Vec4 {
+    let mut to_return = position;
+    to_return.x = to_return.x.clamp(min.x, max.x);
+    to_return.y = to_return.y.clamp(min.y, max.y);
+    to_return.z = to_return.z.clamp(min.z, max.z);
+    return to_return;
 }
 
 // End Helper Functions

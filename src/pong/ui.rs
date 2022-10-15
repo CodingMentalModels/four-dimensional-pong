@@ -10,28 +10,28 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        let mut app = App::new();
         app.add_plugin(EguiPlugin)
-            .insert_resource(
-                WindowDescriptor {
-                title: "4D Pong".to_string(),
-                width: 500.,
-                height: 500.,
-                present_mode: PresentMode::Fifo,
-                ..default()
-                }
-            ).add_loopless_state(PongState::LoadingAssets)
-            .add_enter_system(PongState::InGame, ui_load_system);
+            .add_enter_system(PongState::SettingUpUI, configure_visuals)
+            .add_enter_system(PongState::SettingUpUI, ui_load_system)
+            .add_system(ui_system.run_in_state(PongState::InGame));
     }
 }
 
-
 // Systems
+
+fn configure_visuals(mut egui_ctx: ResMut<EguiContext>) {
+    egui_ctx.ctx_mut().set_visuals(egui::Visuals {
+        window_rounding: 0.0.into(),
+        ..Default::default()
+    });
+}
+
 
 fn ui_load_system(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
+
     let font = asset_server.load("fonts/Roboto-Regular.ttf");
     commands.spawn_bundle(
         NodeBundle {
@@ -70,6 +70,24 @@ fn ui_load_system(
             ).insert(ScoreComponent(Player::Red, 0));
         }
     );
+
+    commands.insert_resource(NextState(PongState::LoadingAssets));
+
+}
+
+fn ui_system(
+    mut egui_ctx: ResMut<EguiContext>,
+) {
+    
+    egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx_mut(), |ui| {
+        egui::menu::bar(ui, |ui| {
+            egui::menu::menu_button(ui, "File", |ui| {
+                if ui.button("Quit").clicked() {
+                    std::process::exit(0);
+                }
+            });
+        });
+    });
 }
 
 // End Systems

@@ -1,3 +1,4 @@
+use bevy::render::render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 use bevy::{prelude::*, window::PresentMode};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use egui::TextureHandle;
@@ -12,8 +13,8 @@ pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(EguiPlugin)
-            .add_enter_system(PongState::SettingUpUI, configure_visuals)
-            .add_enter_system(PongState::SettingUpUI, ui_load_system)
+            .add_enter_system(PongState::LoadingUI, configure_visuals)
+            .add_enter_system(PongState::LoadingUI, ui_load_system)
             .add_system(ui_system.run_in_state(PongState::InGame));
     }
 }
@@ -77,7 +78,7 @@ fn ui_load_system(
 
 fn ui_system(
     mut egui_ctx: ResMut<EguiContext>,
-    mut projection_images: Res<ProjectionImages>,
+    projection_images: Res<ProjectionImages>,
 ) {
     
     egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx_mut(), |ui| {
@@ -93,16 +94,16 @@ fn ui_system(
         });
     });
 
-    let (xw_image, yw_image, zw_image) = projection_images.unpack();
+    // let (xw_image, yw_image, zw_image) = projection_images.unpack();
 
-    let texture = egui_ctx.add_image(xw_image.clone());
-    egui::Area::new("xw-projection")
-        .anchor(egui::Align2::LEFT_BOTTOM, egui::Vec2::ZERO)
-        .show(
-            egui_ctx.ctx_mut(), |ui| {
-                ui.image(texture, egui::vec2(200.0, 200.0));
-            }
-        );
+    // let texture = egui_ctx.add_image(xw_image.clone());
+    // egui::Area::new("xw-projection")
+    //     .anchor(egui::Align2::LEFT_BOTTOM, egui::Vec2::ZERO)
+    //     .show(
+    //         egui_ctx.ctx_mut(), |ui| {
+    //             ui.image(texture, egui::vec2(200.0, 200.0));
+    //         }
+    //     );
 }
 
 // End Systems

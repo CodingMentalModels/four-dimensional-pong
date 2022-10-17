@@ -2,6 +2,7 @@ mod pong;
 
 use bevy::prelude::*;
 use iyes_loopless::prelude::*;
+use pong::assets::LoadAssetsPlugin;
 use pong::ui::UIPlugin;
 
 use crate::pong::pong::PongPlugin;
@@ -11,6 +12,7 @@ fn main() {
     App::new()    
         .add_plugins(DefaultPlugins)
         .add_loopless_state(PongState::LoadingAssets)
+        .add_plugin(LoadAssetsPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(PongPlugin)
         .run();

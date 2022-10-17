@@ -1,9 +1,9 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, gltf::Gltf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PongState {
-    SettingUpUI,
     LoadingAssets,
+    LoadingUI,
     InGame,
     Paused,
 }
@@ -20,3 +20,5 @@ impl ProjectionImages {
         (self.0.clone(), self.1.clone(), self.2.clone())
     }
 }
+
+pub struct GltfModel(pub Handle<Gltf>);

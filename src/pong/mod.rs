@@ -5,3 +5,4 @@ pub mod ui;
 pub mod components;
 pub mod resources;
 pub mod constants;
+pub mod axis;

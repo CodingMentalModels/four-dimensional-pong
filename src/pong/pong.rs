@@ -1,4 +1,4 @@
-use rand::{seq::SliceRandom};
+use rand::{seq::SliceRandom, Rng};
 
 use bevy::{prelude::*, gltf::{Gltf, GltfMesh}, asset::LoadState, render::{camera::{RenderTarget}}};
 use iyes_loopless::prelude::*;
@@ -7,6 +7,7 @@ use crate::pong::components::*;
 use crate::pong::resources::*;
 use crate::pong::constants::*;
 use crate::pong::player::Player;
+use crate::pong::axis::Axis;
 
 
 pub struct PongPlugin;
@@ -125,9 +126,17 @@ fn collision_system(
                 // Do nothing
             }
         }
+        match is_wall_collision(ball_position.0) {
+            Some(axis) => {
+                ball_velocity.0 = reflect_on_axis(ball_velocity.0, axis);
+            },
+            None => {
+                // Do nothing
+            }
+        }
         for (paddle_position, _) in paddle_query.iter() {
             if is_ball_paddle_collision(ball_position.0, paddle_position.0) {
-                ball_velocity.0 = reflect(ball_velocity.0);
+                ball_velocity.0 = reflect_w(ball_velocity.0);
             }
         }
     }
@@ -178,15 +187,39 @@ fn score_system(
 // Helper Functions
 
 fn roll_initial_velocity() -> Vec4 {
+    let rng = &mut rand::thread_rng();
+
     let directions = vec![-1., 1.];
-    let w_velocity = directions.choose(&mut rand::thread_rng()).expect("Directions is never empty.");
-    Vec4::new(0.0, 0.0, 0.0, *w_velocity)
+    let w_velocity = directions.choose(rng).expect("Directions is never empty.");
+    let x_velocity = rng.gen_range(0.0..1.0);
+    let y_velocity = rng.gen_range(0.0..1.0);
+    let z_velocity = rng.gen_range(0.0..1.0);
+    Vec4::new(x_velocity, y_velocity, z_velocity, *w_velocity)
 }
 
-fn reflect(vector: Vec4) -> Vec4 {
-    let mut to_return = vector;
-    to_return.w *= -1.;
-    return to_return;
+fn reflect_on_axis(position: Vec4, axis: Axis) -> Vec4 {
+    match axis {
+        Axis::X => Vec4::new(-position.x, position.y, position.z, position.w),
+        Axis::Y => Vec4::new(position.x, -position.y, position.z, position.w),
+        Axis::Z => Vec4::new(position.x, position.y, -position.z, position.w),
+        Axis::W => Vec4::new(position.x, position.y, position.z, -position.w),
+    }
+}
+
+fn reflect_w(vector: Vec4) -> Vec4 {
+    reflect_on_axis(vector, Axis::W)
+}
+
+fn is_wall_collision(ball_position: Vec4) -> Option<Axis> {
+    if ball_position.x.abs() > ARENA_WIDTH/2. {
+        Some(Axis::X)
+    } else if ball_position.y.abs() > ARENA_WIDTH/2. {
+        Some(Axis::Y)
+    } else if ball_position.z.abs() > ARENA_WIDTH/2. {
+        Some(Axis::Z)
+    } else {
+        None
+    }
 }
 
 fn is_ball_paddle_collision(ball_position: Vec4, paddle_position: Vec4) -> bool {

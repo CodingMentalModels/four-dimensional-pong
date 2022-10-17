@@ -178,19 +178,19 @@ fn stage_load_system(
             }
         );
 
-        // let (xw_image_handle, yw_image_handle, zw_image_handle) = projection_images.unpack();
+        let (xw_image_handle, yw_image_handle, zw_image_handle) = projection_images.unpack();
 
-        // commands.spawn_bundle(
-        //     Camera3dBundle {
-        //         transform: Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y),
-        //         camera: Camera {
-        //             target: RenderTarget::Image(xw_image_handle.clone()),
-        //             priority: -1,
-        //             ..default()
-        //         },
-        //         ..default()
-        //     }
-        // );
+        commands.spawn_bundle(
+            Camera3dBundle {
+                transform: Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y),
+                camera: Camera {
+                    target: RenderTarget::Image(xw_image_handle.clone()),
+                    priority: -1,
+                    ..default()
+                },
+                ..default()
+            }
+        );
 
         commands.insert_resource(NextState(PongState::LoadingUI));
     }

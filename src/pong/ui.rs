@@ -94,16 +94,16 @@ fn ui_system(
         });
     });
 
-    // let (xw_image, yw_image, zw_image) = projection_images.unpack();
+    let (xw_image, yw_image, zw_image) = projection_images.unpack();
 
-    // let texture = egui_ctx.add_image(xw_image.clone());
-    // egui::Area::new("xw-projection")
-    //     .anchor(egui::Align2::LEFT_BOTTOM, egui::Vec2::ZERO)
-    //     .show(
-    //         egui_ctx.ctx_mut(), |ui| {
-    //             ui.image(texture, egui::vec2(200.0, 200.0));
-    //         }
-    //     );
+    let texture = egui_ctx.add_image(xw_image.clone());
+    egui::Area::new("xw-projection")
+        .anchor(egui::Align2::LEFT_BOTTOM, egui::Vec2::ZERO)
+        .show(
+            egui_ctx.ctx_mut(), |ui| {
+                ui.image(texture, egui::vec2(200.0, 200.0));
+            }
+        );
 }
 
 // End Systems

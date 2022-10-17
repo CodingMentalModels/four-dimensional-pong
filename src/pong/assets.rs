@@ -171,26 +171,19 @@ fn stage_load_system(
         let y_from_blender = -8.21107;
         let z_from_blender = 4.66824;
         let scalar = 0.5;
+        let transform = Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y);
         commands.spawn_bundle(
             Camera3dBundle {
-                transform: Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y),
+                transform: transform,
                 ..default()
             }
         );
 
         let (xw_image_handle, yw_image_handle, zw_image_handle) = projection_images.unpack();
 
-        commands.spawn_bundle(
-            Camera3dBundle {
-                transform: Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y),
-                camera: Camera {
-                    target: RenderTarget::Image(xw_image_handle.clone()),
-                    priority: -1,
-                    ..default()
-                },
-                ..default()
-            }
-        );
+        commands = spawn_cameras_on_images(commands, xw_image_handle, -1, transform);
+        commands = spawn_cameras_on_images(commands, yw_image_handle, -2, transform);
+        commands = spawn_cameras_on_images(commands, zw_image_handle, -3, transform);
 
         commands.insert_resource(NextState(PongState::LoadingUI));
     }
@@ -204,6 +197,23 @@ fn stage_load_system(
 fn get_mesh_from_gltf_or_panic(gltf_mesh_assets: &Res<Assets<GltfMesh>>, gltf_mesh_handle: &Handle<GltfMesh>) -> Handle<Mesh> {
     let gltf_mesh = gltf_mesh_assets.get(&gltf_mesh_handle).expect("The GLTFMesh should exist.");
     gltf_mesh.primitives[0].mesh.clone()
+}
+
+fn spawn_cameras_on_images<'a, 'b>(mut commands: Commands<'a, 'b>, image_handle: Handle<Image>, priority: isize, transform: Transform) -> Commands<'a, 'b> {
+    
+    commands.spawn_bundle(
+        Camera3dBundle {
+            transform: transform,
+            camera: Camera {
+                target: RenderTarget::Image(image_handle.clone()),
+                priority: priority,
+                ..default()
+            },
+            ..default()
+        }
+    );
+    
+    return commands;
 }
 
 // End Helper Functions

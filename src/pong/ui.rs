@@ -95,21 +95,29 @@ fn ui_system(
     });
 
     let (xw_image, yw_image, zw_image) = projection_images.unpack();
+    
+    let xw_texture = egui_ctx.add_image(xw_image.clone());
+    let yw_texture = egui_ctx.add_image(yw_image.clone());
+    let zw_texture = egui_ctx.add_image(zw_image.clone());
 
-    let texture = egui_ctx.add_image(xw_image.clone());
-    egui::Area::new("xw-projection")
-        .anchor(egui::Align2::LEFT_BOTTOM, egui::Vec2::ZERO)
-        .show(
-            egui_ctx.ctx_mut(), |ui| {
-                ui.image(texture, egui::vec2(200.0, 200.0));
-            }
-        );
+    instantiate_projection_panel(egui_ctx.ctx_mut(), xw_texture, "xw-projection", egui::Align2::LEFT_BOTTOM);
+    instantiate_projection_panel(egui_ctx.ctx_mut(), yw_texture, "yw-projection", egui::Align2::CENTER_BOTTOM);
+    instantiate_projection_panel(egui_ctx.ctx_mut(), zw_texture, "zw-projection", egui::Align2::RIGHT_BOTTOM);
 }
 
 // End Systems
 
 // Helper functions
 
+fn instantiate_projection_panel(egui_ctx: &egui::Context, texture: egui::TextureId, id: &str, align: egui::Align2) {
+    egui::Area::new(id)
+        .anchor(align, egui::Vec2::ZERO)
+        .show(
+            egui_ctx, |ui| {
+                ui.image(texture, egui::vec2(200.0, 200.0));
+            }
+        );
+}
 
 fn get_text_bundle(
     text: &str,

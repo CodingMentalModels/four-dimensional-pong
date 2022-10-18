@@ -94,25 +94,22 @@ fn ui_system(
     });
 
     let (xw_image, yw_image, zw_image) = projection_images.unpack();
-    
-    let xw_texture = egui_ctx.add_image(xw_image.clone());
-    let yw_texture = egui_ctx.add_image(yw_image.clone());
-    let zw_texture = egui_ctx.add_image(zw_image.clone());
 
-    instantiate_projection_panel(egui_ctx.ctx_mut(), xw_texture, "xw-projection", "X-W Projection", egui::Align2::LEFT_BOTTOM);
-    instantiate_projection_panel(egui_ctx.ctx_mut(), yw_texture, "yw-projection", "Y-W Projection", egui::Align2::CENTER_BOTTOM);
-    instantiate_projection_panel(egui_ctx.ctx_mut(), zw_texture, "zw-projection", "Z-W Projection", egui::Align2::RIGHT_BOTTOM);
+    instantiate_projection_panel(&mut egui_ctx, xw_image, "xw-projection", "X-W Projection", egui::Align2::LEFT_BOTTOM);
+    instantiate_projection_panel(&mut egui_ctx, yw_image, "yw-projection", "Y-W Projection", egui::Align2::CENTER_BOTTOM);
+    instantiate_projection_panel(&mut egui_ctx, zw_image, "zw-projection", "Z-W Projection", egui::Align2::RIGHT_BOTTOM);
 }
 
 // End Systems
 
 // Helper functions
 
-fn instantiate_projection_panel(egui_ctx: &egui::Context, texture: egui::TextureId, id: &str, label: &str, align: egui::Align2) {
+fn instantiate_projection_panel(egui_ctx: &mut EguiContext, image: Handle<Image>, id: &str, label: &str, align: egui::Align2) {
+    let texture = egui_ctx.add_image(image);
     egui::Area::new(id)
         .anchor(align, egui::Vec2::ZERO)
         .show(
-            egui_ctx, |ui| {
+            egui_ctx.ctx_mut(), |ui| {
                 ui.set_width(PROJECTION_AREA_WIDTH);
                 ui.set_height(PROJECTION_AREA_WIDTH);
                 ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {

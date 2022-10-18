@@ -1,11 +1,10 @@
-use bevy::render::render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
-use bevy::{prelude::*, window::PresentMode};
-use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
-use egui::TextureHandle;
+use bevy::{prelude::*};
+use bevy_egui::{egui, EguiContext, EguiPlugin};
 use iyes_loopless::prelude::*;
 
 use crate::pong::components::*;
 use crate::pong::resources::*;
+use crate::pong::constants::*;
 use crate::pong::player::Player;
 
 pub struct UIPlugin;
@@ -114,8 +113,12 @@ fn instantiate_projection_panel(egui_ctx: &egui::Context, texture: egui::Texture
         .anchor(align, egui::Vec2::ZERO)
         .show(
             egui_ctx, |ui| {
-                ui.label(egui::RichText::new(label).color(egui::Color32::BLACK).underline());
-                ui.image(texture, egui::vec2(200.0, 200.0));
+                ui.set_width(PROJECTION_AREA_WIDTH);
+                ui.set_height(PROJECTION_AREA_WIDTH);
+                ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                    ui.label(egui::RichText::new(label).color(egui::Color32::BLACK).underline());
+                    ui.image(texture, egui::vec2(PROJECTION_AREA_WIDTH, PROJECTION_AREA_WIDTH));
+                });
             }
         );
 }

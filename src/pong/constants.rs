@@ -6,3 +6,4 @@ pub const GOAL_OFFSET_FROM_ARENA: f32 = 0.1;
 pub const PADDLE_SPEED: f32 = 2.0;
 pub const PADDLE_WIDTH: f32 = 0.1;
 pub const BALL_RADIUS: f32 = 0.03;
+pub const PROJECTION_AREA_WIDTH: f32 = 200.0;

@@ -16,7 +16,7 @@ use crate::pong::constants::*;
 
 use super::player::Player;
 
-const GLTF_PATH: &str = "pong.glb";
+const GLTF_PATH: &str = "four-dimensional-pong.glb";
 
 pub struct LoadAssetsPlugin;
 
@@ -104,12 +104,12 @@ fn stage_load_system(
     }
 
     if let Some(model_root) = assets_gltf.get(&model.0) {
-        let arena = model_root.meshes[1].clone();
-        let ball = model_root.meshes[2].clone();
-        let player_paddle = model_root.meshes[3].clone();
-        let opponent_paddle = model_root.meshes[4].clone();
+        let arena = model_root.named_meshes["Arena"].clone();
+        let ball = model_root.named_meshes["Ball"].clone();
+        let player_paddle = model_root.named_meshes["Blue Paddle"].clone();
+        let opponent_paddle = model_root.named_meshes["Red Paddle"].clone();
 
-        let arena_material = model_root.named_materials["Material.001"].clone();
+        let arena_material = model_root.named_materials["Arena Material"].clone();
         let ball_material = model_root.named_materials["Ball Material"].clone();
         let player_paddle_material = model_root.named_materials["Blue Paddle Material"].clone();
         let opponent_paddle_material = model_root.named_materials["Red Paddle Material"].clone();

@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 use bevy::asset::LoadState;
 use bevy::gltf::Gltf;
 use bevy::gltf::GltfMesh;
@@ -105,6 +107,7 @@ fn stage_load_system(
 
     if let Some(model_root) = assets_gltf.get(&model.0) {
         let arena = model_root.named_meshes["Arena"].clone();
+        let rectangular_arena = model_root.named_meshes["Rectangular Arena"].clone();
         let ball = model_root.named_meshes["Ball"].clone();
         let player_paddle = model_root.named_meshes["Blue Paddle"].clone();
         let opponent_paddle = model_root.named_meshes["Red Paddle"].clone();
@@ -118,6 +121,16 @@ fn stage_load_system(
             PbrBundle {
                 mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &arena),
                 material: arena_material.clone(),
+                ..Default::default()
+            }
+        );
+
+        let arena_rect_transform = Transform::from_xyz(0.0, Y_OFFSET_FOR_PROJECTIONS, 0.0);
+        commands.spawn_bundle(
+            PbrBundle {
+                mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &rectangular_arena),
+                material: arena_material.clone(),
+                transform: arena_rect_transform,
                 ..Default::default()
             }
         );
@@ -167,11 +180,12 @@ fn stage_load_system(
         .insert(MaterialHandleComponent(opponent_paddle_material))
         .insert(NeedsRenderingComponent);
 
-        let x_from_blender = 0.019767;
+        let x_from_blender = 0.0;
         let y_from_blender = -8.21107;
         let z_from_blender = 4.66824;
         let scalar = 0.5;
-        let transform = Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar).looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y);
+        let transform = Transform::from_xyz(x_from_blender*scalar, y_from_blender*scalar, z_from_blender*scalar)
+            .looking_at(Vec3::new(0.0, 0., 0.0), Vec3::Y);
         commands.spawn_bundle(
             Camera3dBundle {
                 transform: transform,
@@ -181,9 +195,9 @@ fn stage_load_system(
 
         let (xw_image_handle, yw_image_handle, zw_image_handle) = projection_images.unpack();
 
-        commands = spawn_cameras_on_images(commands, xw_image_handle, -1, transform);
-        commands = spawn_cameras_on_images(commands, yw_image_handle, -2, transform);
-        commands = spawn_cameras_on_images(commands, zw_image_handle, -3, transform);
+        commands = spawn_cameras_on_images(commands, xw_image_handle, -1, transform, Vec3::new(0. , Y_OFFSET_FOR_PROJECTIONS, 0.));
+        commands = spawn_cameras_on_images(commands, yw_image_handle, -2, transform, Vec3::new(0. , Y_OFFSET_FOR_PROJECTIONS, 0.));
+        commands = spawn_cameras_on_images(commands, zw_image_handle, -3, transform, Vec3::new(0. , Y_OFFSET_FOR_PROJECTIONS, 0.));
 
         commands.insert_resource(NextState(PongState::LoadingUI));
     }
@@ -199,11 +213,19 @@ fn get_mesh_from_gltf_or_panic(gltf_mesh_assets: &Res<Assets<GltfMesh>>, gltf_me
     gltf_mesh.primitives[0].mesh.clone()
 }
 
-fn spawn_cameras_on_images<'a, 'b>(mut commands: Commands<'a, 'b>, image_handle: Handle<Image>, priority: isize, transform: Transform) -> Commands<'a, 'b> {
+fn spawn_cameras_on_images<'a, 'b>(
+    mut commands: Commands<'a, 'b>,
+    image_handle: Handle<Image>,
+    priority: isize,
+    transform: Transform,
+    translation: Vec3,
+) -> Commands<'a, 'b> {
     
+    let mut final_transform  = transform;
+    final_transform = Transform::from_translation(translation) * final_transform;
     commands.spawn_bundle(
         Camera3dBundle {
-            transform: transform,
+            transform: final_transform,
             camera: Camera {
                 target: RenderTarget::Image(image_handle.clone()),
                 priority: priority,

@@ -152,10 +152,10 @@ fn collision_system(
 
 fn render_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent), With<NeedsRenderingComponent>>,
+    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, &RenderTransformComponent), With<NeedsRenderingComponent>>,
 ) {
-    for (mut transform, material, position) in query.iter_mut() {
-        *transform = transform.with_translation(position.0.truncate());
+    for (mut transform, material, position, render_transform) in query.iter_mut() {
+        *transform = Transform::from_translation(position.0.truncate()) * render_transform.0;
         match materials.get_mut(&material.0) {
             Some(material) => {
                 material.base_color = get_color_from_w(position.0.w, ARENA_LENGTH);

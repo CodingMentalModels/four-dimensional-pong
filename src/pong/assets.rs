@@ -16,6 +16,7 @@ use crate::pong::components::*;
 use crate::pong::resources::*;
 use crate::pong::constants::*;
 
+use super::player;
 use super::player::Player;
 
 const GLTF_PATH: &str = "four-dimensional-pong.glb";
@@ -135,50 +136,39 @@ fn stage_load_system(
             }
         );
 
-        
-        commands.spawn_bundle(
-            PbrBundle {
-                mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &ball),
-                material: ball_material.clone(),
-                ..Default::default()
-            }
-        ).insert(BallComponent)
-        .insert(PositionComponent(Vec4::ZERO))
-        .insert(VelocityComponent(Vec4::ZERO))
-        .insert(MaterialHandleComponent(ball_material))
-        .insert(NeedsRenderingComponent);
-
+        spawn_object_and_projections(
+            &mut commands,
+            &assets_gltf_meshes,
+            &ball,
+            &ball_material,
+            Vec4::ZERO,
+            BallComponent,
+            None,
+        );
         
         let player_starting_position = Vec4::new(0., 0., -PADDLE_STARTING_OFFSET, -(ARENA_LENGTH / 2.));
         let opponent_starting_position = Vec4::new(0., 0., PADDLE_STARTING_OFFSET, (ARENA_LENGTH / 2.0));
 
-        commands.spawn_bundle(
-            PbrBundle {
-                mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &player_paddle),
-                material: player_paddle_material.clone(),
-                transform: Transform::from_translation(player_starting_position.truncate()),
-                ..Default::default()
-            }
-        ).insert(PaddleComponent(Player::Blue))
-        .insert(PositionComponent(player_starting_position))
-        .insert(VelocityComponent(Vec4::ZERO))
-        .insert(MaterialHandleComponent(player_paddle_material))
-        .insert(NeedsRenderingComponent)
-        .insert(PlayerInputComponent);
+        spawn_object_and_projections(
+            &mut commands,
+            &assets_gltf_meshes,
+            &player_paddle,
+            &player_paddle_material,
+            player_starting_position,
+            PaddleComponent(Player::Blue),
+            Some(PlayerInputComponent),
+        );
 
-        
-        commands.spawn_bundle(
-            PbrBundle {
-                mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &opponent_paddle),
-                material: opponent_paddle_material.clone(),
-                transform: Transform::from_translation(opponent_starting_position.truncate()),
-                ..Default::default()
-            }
-        ).insert(PaddleComponent(Player::Red))
-        .insert(PositionComponent(opponent_starting_position))
-        .insert(VelocityComponent(Vec4::ZERO))
-        .insert(MaterialHandleComponent(opponent_paddle_material))
-        .insert(NeedsRenderingComponent);
+
+        spawn_object_and_projections(
+            &mut commands,
+            &assets_gltf_meshes,
+            &opponent_paddle,
+            &opponent_paddle_material,
+            opponent_starting_position,
+            PaddleComponent(Player::Red),
+            None,
+        );
 
         let x_from_blender = 0.0;
         let y_from_blender = -8.21107;
@@ -207,6 +197,73 @@ fn stage_load_system(
 // End Systems
 
 // Helper Functions
+
+fn spawn_object_and_projections(
+    commands: &mut Commands,
+    assets_gltf_meshes: &Res<Assets<GltfMesh>>,
+    mesh: &Handle<GltfMesh>,
+    material: &Handle<StandardMaterial>,
+    position: Vec4,
+    label_component: impl Component + Copy,
+    input_component: Option<PlayerInputComponent>,
+) {
+    // Spawn actual object for the main camera
+    spawn_object(
+        commands,
+        assets_gltf_meshes,
+        mesh,
+        material,
+        position,
+        Transform::identity(),
+        label_component,
+        input_component
+    );
+
+    spawn_object(
+        commands,
+        assets_gltf_meshes,
+        mesh,
+        material,
+        position,
+        Transform::from_translation(Vec3::new(0., Y_OFFSET_FOR_PROJECTIONS, 0.)),
+        label_component,
+        input_component
+    );
+}
+
+fn spawn_object(
+    commands: &mut Commands,
+    assets_gltf_meshes: &Res<Assets<GltfMesh>>,
+    mesh: &Handle<GltfMesh>,
+    material: &Handle<StandardMaterial>,
+    position: Vec4,
+    projection_transform: Transform,
+    label_component: impl Component + Copy,
+    input_component: Option<PlayerInputComponent>,
+) {
+    let transform = projection_transform * Transform::from_translation(position.truncate());
+    let mut entity_commands = commands.spawn_bundle(
+        PbrBundle {
+            transform: transform,
+            mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &mesh),
+            material: material.clone(),
+            ..Default::default()
+        }
+    );
+    entity_commands.insert(label_component)
+        .insert(RenderTransformComponent(projection_transform))
+        .insert(PositionComponent(position))
+        .insert(VelocityComponent(Vec4::ZERO))
+        .insert(MaterialHandleComponent(material.clone()))
+        .insert(NeedsRenderingComponent);
+
+    match input_component {
+        Some(input_component) => {
+            entity_commands.insert(input_component);
+        },
+        None => {}
+    };
+}
 
 fn get_mesh_from_gltf_or_panic(gltf_mesh_assets: &Res<Assets<GltfMesh>>, gltf_mesh_handle: &Handle<GltfMesh>) -> Handle<Mesh> {
     let gltf_mesh = gltf_mesh_assets.get(&gltf_mesh_handle).expect("The GLTFMesh should exist.");

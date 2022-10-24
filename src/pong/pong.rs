@@ -22,6 +22,7 @@ impl Plugin for PongPlugin {
         .add_system(input_system.run_in_state(PongState::InGame))
         .add_system(movement_system.run_in_state(PongState::InGame))
         .add_system(collision_system.run_in_state(PongState::InGame))
+        .add_system(projection_system.run_in_state(PongState::InGame))
         .add_system(render_system.run_in_state(PongState::InGame))
         .add_system(score_system.run_in_state(PongState::InGame));
     }
@@ -147,6 +148,19 @@ fn collision_system(
             -clamp_distance*Vec3::ONE,
             clamp_distance*Vec3::ONE,
         );
+    }
+}
+
+fn projection_system(
+    mut position_query: Query<(Entity, &PositionComponent), Without<ProjectionComponent>>,
+    mut projection_query: Query<(&mut PositionComponent, &ProjectionComponent)>,
+) {
+    for (mut projection_position, projection_entity) in projection_query.iter_mut() {
+        let real_entity_position = position_query.iter()
+            .filter(|(entity, _)| *entity == projection_entity.0)
+            .next()
+            .expect("A Projection Entity exists without a corresponding object.").1;
+        projection_position.0 = real_entity_position.0;
     }
 }
 

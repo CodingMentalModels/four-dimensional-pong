@@ -26,6 +26,9 @@ pub struct PositionComponent(pub Vec4);
 #[derive(Component, Clone, Copy)]
 pub struct VelocityComponent(pub Vec4);
 
+#[derive(Component, Clone, Copy)]
+pub struct ProjectionComponent(pub Entity);
+
 #[derive(Component, Clone)]
 pub struct MaterialHandleComponent(pub Handle<StandardMaterial>);
 

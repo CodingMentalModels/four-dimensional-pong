@@ -208,7 +208,7 @@ fn spawn_object_and_projections(
     input_component: Option<PlayerInputComponent>,
 ) {
     // Spawn actual object for the main camera
-    spawn_object(
+    let entity = spawn_object(
         commands,
         assets_gltf_meshes,
         mesh,
@@ -217,43 +217,33 @@ fn spawn_object_and_projections(
         Transform::identity(),
         label_component,
         input_component,
-        true
     );
 
-    spawn_object(
+    spawn_projection(
         commands,
         assets_gltf_meshes,
         mesh,
         material,
-        position,
+        entity,
         Transform::from_translation(Vec3::new(-DELTA_X_FOR_PROJECTIONS, Y_OFFSET_FOR_PROJECTIONS, 0.)),
-        label_component,
-        input_component,
-        false,
     );
 
-    spawn_object(
+    spawn_projection(
         commands,
         assets_gltf_meshes,
         mesh,
         material,
-        position,
+        entity,
         Transform::from_translation(Vec3::new(0., Y_OFFSET_FOR_PROJECTIONS, 0.)),
-        label_component,
-        input_component,
-        false,
     );
 
-    spawn_object(
+    spawn_projection(
         commands,
         assets_gltf_meshes,
         mesh,
         material,
-        position,
+        entity,
         Transform::from_translation(Vec3::new(DELTA_X_FOR_PROJECTIONS, Y_OFFSET_FOR_PROJECTIONS, 0.)),
-        label_component,
-        input_component,
-        false,
     );
 }
 
@@ -266,8 +256,7 @@ fn spawn_object(
     projection_transform: Transform,
     label_component: impl Component + Copy,
     input_component: Option<PlayerInputComponent>,
-    is_real_object: bool,
-) {
+) -> Entity {
     let transform = projection_transform * Transform::from_translation(position.truncate());
     let mut entity_commands = commands.spawn_bundle(
         PbrBundle {
@@ -290,6 +279,35 @@ fn spawn_object(
         },
         None => {}
     };
+
+    return entity_commands.id();
+}
+
+fn spawn_projection(
+    commands: &mut Commands,
+    assets_gltf_meshes: &Res<Assets<GltfMesh>>,
+    mesh: &Handle<GltfMesh>,
+    material: &Handle<StandardMaterial>,
+    object_id: Entity,
+    projection_transform: Transform,
+) {
+    let position = Vec4::ZERO;
+    let transform = projection_transform * Transform::from_translation(position.truncate());
+    let mut entity_commands = commands.spawn_bundle(
+        PbrBundle {
+            transform: transform,
+            mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &mesh),
+            material: material.clone(),
+            ..Default::default()
+        }
+    );
+    entity_commands
+        .insert(RenderTransformComponent(projection_transform))
+        .insert(PositionComponent(position))
+        .insert(ProjectionComponent(object_id))
+        .insert(MaterialHandleComponent(material.clone()))
+        .insert(NeedsRenderingComponent);
+
 }
 
 fn get_mesh_from_gltf_or_panic(gltf_mesh_assets: &Res<Assets<GltfMesh>>, gltf_mesh_handle: &Handle<GltfMesh>) -> Handle<Mesh> {

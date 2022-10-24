@@ -9,6 +9,8 @@ use crate::pong::constants::*;
 use crate::pong::player::Player;
 use crate::pong::axis::Axis;
 
+use super::rotations::{Rotation, Axis4};
+
 
 pub struct PongPlugin;
 
@@ -152,30 +154,43 @@ fn collision_system(
 }
 
 fn projection_system(
-    mut position_query: Query<(Entity, &PositionComponent), Without<ProjectionComponent>>,
+    position_query: Query<(Entity, &PositionComponent), Without<ProjectionComponent>>,
     mut projection_query: Query<(&mut PositionComponent, &ProjectionComponent)>,
 ) {
-    for (mut projection_position, projection_entity) in projection_query.iter_mut() {
+    for (mut projection_position, projection_component) in projection_query.iter_mut() {
+        let (projection_entity, projection_translation, projection_rotations) = projection_component.unpack();
         let real_entity_position = position_query.iter()
-            .filter(|(entity, _)| *entity == projection_entity.0)
+            .filter(|(entity, _)| *entity == projection_entity)
             .next()
             .expect("A Projection Entity exists without a corresponding object.").1;
-        projection_position.0 = real_entity_position.0;
+        
+        let mut rotated_position = real_entity_position.0;
+        for rotation in projection_rotations.iter() {
+            rotated_position = rotation.rotate(rotated_position);
+        }
+        projection_position.0 = rotated_position + projection_translation;
     }
 }
 
 fn render_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, &RenderTransformComponent), With<NeedsRenderingComponent>>,
+    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, Option<&ProjectionComponent>), With<NeedsRenderingComponent>>,
 ) {
-    for (mut transform, material, position, render_transform) in query.iter_mut() {
-        *transform = Transform::from_translation(position.0.truncate()) * render_transform.0;
-        match materials.get_mut(&material.0) {
-            Some(material) => {
-                material.base_color = get_color_from_w(position.0.w, ARENA_LENGTH);
+    for (mut transform, material, position, maybe_projection) in query.iter_mut() {
+        *transform = Transform::from_translation(position.0.truncate());
+        match maybe_projection {
+            Some(_) => {
+                // Do nothing, let the material get updated by the non-projected w.  
             },
             None => {
-                panic!("Material not found.");
+                match materials.get_mut(&material.0) {
+                    Some(material) => {
+                        material.base_color = get_color_from_w(position.0.w, ARENA_LENGTH);
+                    },
+                    None => {
+                        panic!("Material not found.");
+                    }
+                }
             }
         }
     }

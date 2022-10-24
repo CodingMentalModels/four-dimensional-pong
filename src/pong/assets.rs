@@ -15,9 +15,8 @@ use iyes_loopless::prelude::*;
 use crate::pong::components::*;
 use crate::pong::resources::*;
 use crate::pong::constants::*;
-
-use super::player;
-use super::player::Player;
+use crate::pong::rotations::*;
+use crate::pong::player::Player;
 
 const GLTF_PATH: &str = "four-dimensional-pong.glb";
 
@@ -127,14 +126,9 @@ fn stage_load_system(
         );
 
         let arena_rect_transform = Transform::from_xyz(0.0, Y_OFFSET_FOR_PROJECTIONS, 0.0);
-        commands.spawn_bundle(
-            PbrBundle {
-                mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &rectangular_arena),
-                material: arena_material.clone(),
-                transform: arena_rect_transform,
-                ..Default::default()
-            }
-        );
+        spawn_arena_rectangle(&mut commands, &assets_gltf_meshes, &rectangular_arena, &arena_material, &(Transform::from_xyz(-DELTA_X_FOR_PROJECTIONS, 0.0, 0.0) * arena_rect_transform));
+        spawn_arena_rectangle(&mut commands, &assets_gltf_meshes, &rectangular_arena, &arena_material, &arena_rect_transform);
+        spawn_arena_rectangle(&mut commands, &assets_gltf_meshes, &rectangular_arena, &arena_material, &(Transform::from_xyz(DELTA_X_FOR_PROJECTIONS, 0.0, 0.0) * arena_rect_transform));
 
         spawn_object_and_projections(
             &mut commands,
@@ -185,9 +179,9 @@ fn stage_load_system(
 
         let (xw_image_handle, yw_image_handle, zw_image_handle) = projection_images.unpack();
 
-        commands = spawn_cameras_on_images(commands, xw_image_handle, -1, transform, Vec3::new(-DELTA_X_FOR_PROJECTIONS , Y_OFFSET_FOR_PROJECTIONS, 0.));
-        commands = spawn_cameras_on_images(commands, yw_image_handle, -2, transform, Vec3::new(0. , Y_OFFSET_FOR_PROJECTIONS, 0.));
-        commands = spawn_cameras_on_images(commands, zw_image_handle, -3, transform, Vec3::new(DELTA_X_FOR_PROJECTIONS , Y_OFFSET_FOR_PROJECTIONS, 0.));
+        commands = spawn_cameras_on_images(commands, xw_image_handle, -1, transform, Vec3::new(-DELTA_X_FOR_PROJECTIONS , Y_OFFSET_FOR_PROJECTIONS - EXTRA_ZOOMOUT_FOR_PROJECTIONS, 0.));
+        commands = spawn_cameras_on_images(commands, yw_image_handle, -2, transform, Vec3::new(0. , Y_OFFSET_FOR_PROJECTIONS - EXTRA_ZOOMOUT_FOR_PROJECTIONS, 0.));
+        commands = spawn_cameras_on_images(commands, zw_image_handle, -3, transform, Vec3::new(DELTA_X_FOR_PROJECTIONS , Y_OFFSET_FOR_PROJECTIONS - EXTRA_ZOOMOUT_FOR_PROJECTIONS, 0.));
 
         commands.insert_resource(NextState(PongState::LoadingUI));
     }
@@ -197,6 +191,23 @@ fn stage_load_system(
 // End Systems
 
 // Helper Functions
+
+fn spawn_arena_rectangle(
+    mut commands: &mut Commands,
+    assets_gltf_meshes: &Res<Assets<GltfMesh>>,
+    rectangular_arena: &Handle<GltfMesh>,
+    arena_material: &Handle<StandardMaterial>,
+    transform: &Transform,
+) {
+    commands.spawn_bundle(
+        PbrBundle {
+            mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &rectangular_arena),
+            material: arena_material.clone(),
+            transform: transform.clone(),
+            ..Default::default()
+        }
+    );
+}
 
 fn spawn_object_and_projections(
     commands: &mut Commands,
@@ -214,7 +225,6 @@ fn spawn_object_and_projections(
         mesh,
         material,
         position,
-        Transform::identity(),
         label_component,
         input_component,
     );
@@ -225,7 +235,16 @@ fn spawn_object_and_projections(
         mesh,
         material,
         entity,
-        Transform::from_translation(Vec3::new(-DELTA_X_FOR_PROJECTIONS, Y_OFFSET_FOR_PROJECTIONS, 0.)),
+        vec![
+            Rotation::new(Axis4::X, Axis4::Z, 1),
+            Rotation::new(Axis4::W, Axis4::X, 1),
+        ],
+        Vec4::new(
+            -DELTA_X_FOR_PROJECTIONS,
+            Y_OFFSET_FOR_PROJECTIONS,
+            0.,
+            0.
+        ),
     );
 
     spawn_projection(
@@ -234,7 +253,15 @@ fn spawn_object_and_projections(
         mesh,
         material,
         entity,
-        Transform::from_translation(Vec3::new(0., Y_OFFSET_FOR_PROJECTIONS, 0.)),
+        vec![
+            Rotation::new(Axis4::W, Axis4::X, 1),
+        ],
+        Vec4::new(
+            0.,
+            Y_OFFSET_FOR_PROJECTIONS,
+            0.,
+            0.
+        ),
     );
 
     spawn_projection(
@@ -243,7 +270,16 @@ fn spawn_object_and_projections(
         mesh,
         material,
         entity,
-        Transform::from_translation(Vec3::new(DELTA_X_FOR_PROJECTIONS, Y_OFFSET_FOR_PROJECTIONS, 0.)),
+        vec![
+            Rotation::new(Axis4::Z, Axis4::Y, 3),
+            Rotation::new(Axis4::W, Axis4::X, 1),
+        ],
+        Vec4::new(
+            DELTA_X_FOR_PROJECTIONS,
+            Y_OFFSET_FOR_PROJECTIONS,
+            0.,
+            0.,
+        ),
     );
 }
 
@@ -253,11 +289,10 @@ fn spawn_object(
     mesh: &Handle<GltfMesh>,
     material: &Handle<StandardMaterial>,
     position: Vec4,
-    projection_transform: Transform,
     label_component: impl Component + Copy,
     input_component: Option<PlayerInputComponent>,
 ) -> Entity {
-    let transform = projection_transform * Transform::from_translation(position.truncate());
+    let transform = Transform::from_translation(position.truncate());
     let mut entity_commands = commands.spawn_bundle(
         PbrBundle {
             transform: transform,
@@ -267,7 +302,6 @@ fn spawn_object(
         }
     );
     entity_commands.insert(label_component)
-        .insert(RenderTransformComponent(projection_transform))
         .insert(PositionComponent(position))
         .insert(VelocityComponent(Vec4::ZERO))
         .insert(MaterialHandleComponent(material.clone()))
@@ -289,22 +323,21 @@ fn spawn_projection(
     mesh: &Handle<GltfMesh>,
     material: &Handle<StandardMaterial>,
     object_id: Entity,
-    projection_transform: Transform,
+    projection_rotations: Vec<Rotation>,
+    projection_translation: Vec4,
 ) {
-    let position = Vec4::ZERO;
-    let transform = projection_transform * Transform::from_translation(position.truncate());
+    let projection_transform = Transform::from_translation(projection_translation.truncate());
     let mut entity_commands = commands.spawn_bundle(
         PbrBundle {
-            transform: transform,
+            transform: projection_transform,
             mesh: get_mesh_from_gltf_or_panic(&assets_gltf_meshes, &mesh),
             material: material.clone(),
             ..Default::default()
         }
     );
     entity_commands
-        .insert(RenderTransformComponent(projection_transform))
-        .insert(PositionComponent(position))
-        .insert(ProjectionComponent(object_id))
+        .insert(PositionComponent(projection_translation))
+        .insert(ProjectionComponent(object_id, projection_translation, projection_rotations))
         .insert(MaterialHandleComponent(material.clone()))
         .insert(NeedsRenderingComponent);
 

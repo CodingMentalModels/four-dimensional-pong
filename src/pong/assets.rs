@@ -185,9 +185,9 @@ fn stage_load_system(
 
         let (xw_image_handle, yw_image_handle, zw_image_handle) = projection_images.unpack();
 
-        commands = spawn_cameras_on_images(commands, xw_image_handle, -1, transform, Vec3::new(0. , Y_OFFSET_FOR_PROJECTIONS, 0.));
+        commands = spawn_cameras_on_images(commands, xw_image_handle, -1, transform, Vec3::new(-DELTA_X_FOR_PROJECTIONS , Y_OFFSET_FOR_PROJECTIONS, 0.));
         commands = spawn_cameras_on_images(commands, yw_image_handle, -2, transform, Vec3::new(0. , Y_OFFSET_FOR_PROJECTIONS, 0.));
-        commands = spawn_cameras_on_images(commands, zw_image_handle, -3, transform, Vec3::new(0. , Y_OFFSET_FOR_PROJECTIONS, 0.));
+        commands = spawn_cameras_on_images(commands, zw_image_handle, -3, transform, Vec3::new(DELTA_X_FOR_PROJECTIONS , Y_OFFSET_FOR_PROJECTIONS, 0.));
 
         commands.insert_resource(NextState(PongState::LoadingUI));
     }
@@ -216,7 +216,20 @@ fn spawn_object_and_projections(
         position,
         Transform::identity(),
         label_component,
-        input_component
+        input_component,
+        true
+    );
+
+    spawn_object(
+        commands,
+        assets_gltf_meshes,
+        mesh,
+        material,
+        position,
+        Transform::from_translation(Vec3::new(-DELTA_X_FOR_PROJECTIONS, Y_OFFSET_FOR_PROJECTIONS, 0.)),
+        label_component,
+        input_component,
+        false,
     );
 
     spawn_object(
@@ -227,7 +240,20 @@ fn spawn_object_and_projections(
         position,
         Transform::from_translation(Vec3::new(0., Y_OFFSET_FOR_PROJECTIONS, 0.)),
         label_component,
-        input_component
+        input_component,
+        false,
+    );
+
+    spawn_object(
+        commands,
+        assets_gltf_meshes,
+        mesh,
+        material,
+        position,
+        Transform::from_translation(Vec3::new(DELTA_X_FOR_PROJECTIONS, Y_OFFSET_FOR_PROJECTIONS, 0.)),
+        label_component,
+        input_component,
+        false,
     );
 }
 
@@ -240,6 +266,7 @@ fn spawn_object(
     projection_transform: Transform,
     label_component: impl Component + Copy,
     input_component: Option<PlayerInputComponent>,
+    is_real_object: bool,
 ) {
     let transform = projection_transform * Transform::from_translation(position.truncate());
     let mut entity_commands = commands.spawn_bundle(

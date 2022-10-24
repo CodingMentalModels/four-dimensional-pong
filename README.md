@@ -2,7 +2,6 @@
 
 Pong, but in Four Dimensions
 
-
 ## Motivation
 
 Understand what it means when we say there's a n-th dimension.
@@ -147,7 +146,37 @@ Bevy Game Engine
 ## Design Questions / Decisions
 * AssetServer for the Blender Scene -- Currently doing the easy, simple thing (asset_server.load) but might want to use the more thorough approach later.
 * How can we use asset_server to load or create sub-entities from the glb?
+* Collision System Design:
+    * What can collide?
+        * Ball + X
+            * Ball + Paddle => Ball should bounce and take (x, y, z) momentum from the paddle.
+                * Do we need max x, y, z velocities for the ball?  Yes.
+            * Ball + Arena => Ball should bounce as expected and maintain all momentum
+            * Ball + Goal => Score event should be emitted and ball should be reset to initial position / velocity.
+        * What about Paddles + Arena?  Nope, we'll just clamp the xyz positions of the paddles.
+    * How might a collision system work?
+        * Takes ((BallComponent, CollisionComponent), CollisionComponent) and matches on the type of the non-ball object.  
+        * Depending on the match, handles collisions as needed.
+    * How should we detect collisions between the ball and the paddle?
+        * Is the ball at or beyond the paddle along the w axis/
+        * For each component of the cube (x, y, z), check whether the sphere's center is within its radius of the appropriate region.
+* Plugin Design
+    * PongPlugin
+        * Game logic, components, etc.
+    * UIPlugin
+        * Windows, Viewports, UI widgets, etc.
+    * How to handle components that both need access to?
+        * Option 1: Share them by making them public, say in a shared_components.rs.
+* 
 
+
+## Todo
+* Turn off scoring, w-coloring, and other duplicative systems for the projected objects
+* Ensure that the same initial velocity is used for the projected objects
+* Apply rotations to the relevant copies of meshes, etc. for each of the projections
+    * For each projection, we'll have
+        * Copies of Arena (rectagular prism), balls, paddles
+        * We'll instantiate those with transforms that rotate the balls, paddles to the correct perspective
 
 ## Mistakes
 * We spent a long time trying to debug why asset loading had started to fail:

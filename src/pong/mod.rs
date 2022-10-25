@@ -6,3 +6,4 @@ pub mod components;
 pub mod resources;
 pub mod constants;
 pub mod axis;
+pub mod rotations;

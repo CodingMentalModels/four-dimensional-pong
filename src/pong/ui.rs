@@ -104,6 +104,7 @@ fn ui_system(
 
 fn paused_ui_system(
     mut egui_ctx: ResMut<EguiContext>,
+    mut ai_query: Query<&mut AIComponent>,
 ) {
     egui::Area::new("pause-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
@@ -111,6 +112,18 @@ fn paused_ui_system(
             egui_ctx.ctx_mut(), 
             |ui| {
                 ui.label("Paused");
+                let mut new_speed: Option<Speed> = None;
+                new_speed = ai_speed_button(ui, "AI Speed Easy", AI_PADDLE_SPEED_EASY).map_or(new_speed, |s| Some(s));
+                new_speed = ai_speed_button(ui, "AI Speed Medium", AI_PADDLE_SPEED_MEDIUM).map_or(new_speed, |s| Some(s));
+                new_speed = ai_speed_button(ui, "AI Speed Hard", AI_PADDLE_SPEED_HARD).map_or(new_speed, |s| Some(s));
+                match new_speed {
+                    Some(speed) => {
+                        for mut ai in ai_query.iter_mut() {
+                            ai.0 = speed;
+                        }
+                    },
+                    None => (),
+                }
             }
     );
 }
@@ -127,6 +140,18 @@ fn paused_input_system(
 // End Systems
 
 // Helper functions
+
+fn ai_speed_button(
+    ui: &mut egui::Ui,
+    text: &str,
+    speed: Speed,
+) -> Option<Speed> {
+    if ui.button(text).clicked() {
+        Some(speed)
+    } else {
+        None
+    }
+}
 
 fn instantiate_projection_panel(egui_ctx: &mut EguiContext, image: Handle<Image>, id: &str, label: &str, align: egui::Align2) {
     let texture = egui_ctx.add_image(image);

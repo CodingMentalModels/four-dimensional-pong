@@ -2,11 +2,13 @@ use bevy::prelude::*;
 use crate::pong::player::*;
 use crate::pong::rotations::Rotation;
 
+pub type Speed = f32;
+
 #[derive(Component, Clone, Copy)]
 pub struct PlayerInputComponent;
 
 #[derive(Component, Clone, Copy)]
-pub struct AIComponent(pub Target);
+pub struct AIComponent(pub Speed);
 
 #[derive(Component, Clone, Copy)]
 pub struct BallComponent;

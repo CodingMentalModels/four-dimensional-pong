@@ -119,14 +119,15 @@ fn movement_system(
 }
 
 fn ai_system(
-    mut ball_query: Query<(&PositionComponent, &mut VelocityComponent), With<BallComponent>>,
-    mut paddle_query: Query<(&PositionComponent, &mut VelocityComponent, &mut AIComponent), Without<BallComponent>>,
+    mut ball_query: Query<(&PositionComponent, &VelocityComponent), With<BallComponent>>,
+    mut paddle_query: Query<(&PositionComponent, &mut VelocityComponent, &AIComponent), Without<BallComponent>>,
 ) {
-    for (ball_position, mut ball_velocity) in ball_query.iter_mut() {
-        for (paddle_position, mut paddle_velocity, mut ai_component) in paddle_query.iter_mut() {
+    for (ball_position, ball_velocity) in ball_query.iter_mut() {
+        for (paddle_position, mut paddle_velocity, ai_component) in paddle_query.iter_mut() {
+            let paddle_speed = ai_component.0;
             let mut direction = (ball_position.0 - paddle_position.0).truncate();
             direction = direction.normalize();
-            paddle_velocity.0 = (direction * PADDLE_SPEED).extend(0.);
+            paddle_velocity.0 = (direction * paddle_speed).extend(0.);
         }
     }
 }

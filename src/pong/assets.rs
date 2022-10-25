@@ -163,7 +163,7 @@ fn stage_load_system(
             &opponent_paddle_material,
             opponent_starting_position,
             PaddleComponent(Player::Red),
-            Some(AIComponent(Target::new(Vec3::ZERO))),
+            Some(AIComponent(AI_PADDLE_SPEED_MEDIUM)),
         );
 
         let x_from_blender = 0.0;

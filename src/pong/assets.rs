@@ -151,7 +151,7 @@ fn stage_load_system(
             &player_paddle,
             &player_paddle_material,
             player_starting_position,
-            PaddleComponent(Player::Blue),
+            PaddleComponent(Player::Blue, PADDLE_WIDTH_MODIFIER_MEDIUM),
             Some(PlayerInputComponent),
         );
 
@@ -162,7 +162,7 @@ fn stage_load_system(
             &opponent_paddle,
             &opponent_paddle_material,
             opponent_starting_position,
-            PaddleComponent(Player::Red),
+            PaddleComponent(Player::Red, PADDLE_WIDTH_MODIFIER_MEDIUM),
             Some(AIComponent(AI_PADDLE_SPEED_MEDIUM)),
         );
 

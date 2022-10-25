@@ -3,6 +3,7 @@ use crate::pong::player::*;
 use crate::pong::rotations::Rotation;
 
 pub type Speed = f32;
+pub type SizeModifier = f32;
 
 #[derive(Component, Clone, Copy)]
 pub struct PlayerInputComponent;
@@ -14,7 +15,7 @@ pub struct AIComponent(pub Speed);
 pub struct BallComponent;
 
 #[derive(Component, Clone, Copy)]
-pub struct PaddleComponent(pub Player);
+pub struct PaddleComponent(pub Player, pub SizeModifier);
 
 #[derive(Component, Clone, Copy)]
 pub struct GoalComponent;

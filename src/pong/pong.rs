@@ -157,14 +157,16 @@ fn collision_system(
                 // Do nothing
             }
         }
-        for (paddle_position, _) in paddle_query.iter() {
-            if is_ball_paddle_collision(ball_position.0, paddle_position.0) {
+        for (paddle_position, paddle_component) in paddle_query.iter() {
+            let paddle_size_modifier = paddle_component.1;
+            if is_ball_paddle_collision(ball_position.0, paddle_position.0, paddle_size_modifier) {
                 ball_velocity.0 = reflect_w(ball_velocity.0);
             }
         }
     }
-    for (mut paddle_position, _) in paddle_query.iter_mut() {
-        let clamp_distance = ARENA_WIDTH/2. - PADDLE_WIDTH/2.;
+    for (mut paddle_position, paddle_component) in paddle_query.iter_mut() {
+        let paddle_size_modifier = paddle_component.1;
+        let clamp_distance = ARENA_WIDTH/2. - PADDLE_WIDTH * paddle_size_modifier/2.;
         paddle_position.0 = clamp_3d(
             paddle_position.0, 
             -clamp_distance*Vec3::ONE,
@@ -194,10 +196,19 @@ fn projection_system(
 
 fn render_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, Option<&ProjectionComponent>), With<NeedsRenderingComponent>>,
+    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, Option<&ProjectionComponent>, Option<&PaddleComponent>), With<NeedsRenderingComponent>>,
 ) {
-    for (mut transform, material, position, maybe_projection) in query.iter_mut() {
+    for (mut transform, material, position, maybe_projection, maybe_paddle_component) in query.iter_mut() {
         *transform = Transform::from_translation(position.0.truncate());
+        match maybe_paddle_component {
+            Some(paddle_component) => {
+                let paddle_size_modifier = paddle_component.1;
+                transform.scale = Vec3::ONE * paddle_size_modifier;
+            },
+            None => {
+                // Do nothing
+            }
+        }
         match maybe_projection {
             Some(_) => {
                 // Do nothing, let the material get updated by the non-projected w.  
@@ -271,10 +282,10 @@ fn is_wall_collision(ball_position: Vec4) -> Option<Axis> {
     }
 }
 
-fn is_ball_paddle_collision(ball_position: Vec4, paddle_position: Vec4) -> bool {
+fn is_ball_paddle_collision(ball_position: Vec4, paddle_position: Vec4, paddle_size_modifier: SizeModifier) -> bool {
 
     let ball_radius = BALL_RADIUS;
-    let paddle_radius = PADDLE_WIDTH/2.;
+    let paddle_radius = (PADDLE_WIDTH * paddle_size_modifier)/2.;
 
     // Paddle has no depth, so return false if ball is not in the same plane as the paddle.
     if (ball_position.w - paddle_position.w).abs() > ball_radius {
@@ -504,23 +515,23 @@ mod test_pong_plugin {
 
     #[test]
     fn test_is_ball_paddle_collision() {
-        assert!(is_ball_paddle_collision(Vec4::ZERO, Vec4::ZERO));
-        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., -ARENA_LENGTH/2.)));
+        assert!(is_ball_paddle_collision(Vec4::ZERO, Vec4::ZERO, 1.0));
+        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., -ARENA_LENGTH/2.), 1.0));
         
-        assert!(is_ball_paddle_collision(Vec4::new(1. + BALL_RADIUS, 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(is_ball_paddle_collision(Vec4::new(1., 2. + BALL_RADIUS, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3. + BALL_RADIUS, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(is_ball_paddle_collision(Vec4::new(1. + BALL_RADIUS, 2. + BALL_RADIUS, 3. + BALL_RADIUS, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
+        assert!(is_ball_paddle_collision(Vec4::new(1. + BALL_RADIUS, 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(is_ball_paddle_collision(Vec4::new(1., 2. + BALL_RADIUS, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3. + BALL_RADIUS, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(is_ball_paddle_collision(Vec4::new(1. + BALL_RADIUS, 2. + BALL_RADIUS, 3. + BALL_RADIUS, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         
         let just_beyond_distance = BALL_RADIUS + PADDLE_WIDTH/2. + 0.1;
-        assert!(!is_ball_paddle_collision(Vec4::new(1. + just_beyond_distance, 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(!is_ball_paddle_collision(Vec4::new(1., 2. + just_beyond_distance, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3. + just_beyond_distance, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
+        assert!(!is_ball_paddle_collision(Vec4::new(1. + just_beyond_distance, 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(!is_ball_paddle_collision(Vec4::new(1., 2. + just_beyond_distance, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3. + just_beyond_distance, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         
         let max_diagonal = (Vec3::ONE * PADDLE_WIDTH/2.0);
-        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal - 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal + 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
+        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal - 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal + 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
     }
 
     #[test]

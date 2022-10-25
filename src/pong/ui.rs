@@ -14,7 +14,9 @@ impl Plugin for UIPlugin {
         app.add_plugin(EguiPlugin)
             .add_enter_system(PongState::LoadingUI, configure_visuals)
             .add_enter_system(PongState::LoadingUI, ui_load_system)
-            .add_system(ui_system.run_in_state(PongState::InGame));
+            .add_system(ui_system.run_in_state(PongState::InGame))
+            .add_system(paused_ui_system.run_in_state(PongState::Paused))
+            .add_system(paused_input_system.run_in_state(PongState::Paused));
     }
 }
 
@@ -98,6 +100,28 @@ fn ui_system(
     instantiate_projection_panel(&mut egui_ctx, xw_image, "xw-projection", "X-W Projection", egui::Align2::LEFT_BOTTOM);
     instantiate_projection_panel(&mut egui_ctx, yw_image, "yw-projection", "Y-W Projection", egui::Align2::CENTER_BOTTOM);
     instantiate_projection_panel(&mut egui_ctx, zw_image, "zw-projection", "Z-W Projection", egui::Align2::RIGHT_BOTTOM);
+}
+
+fn paused_ui_system(
+    mut egui_ctx: ResMut<EguiContext>,
+) {
+    egui::Area::new("pause-menu")
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(
+            egui_ctx.ctx_mut(), 
+            |ui| {
+                ui.label("Paused");
+            }
+    );
+}
+
+fn paused_input_system(
+    mut commands: Commands,
+    keyboard_input: Res<Input<KeyCode>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        commands.insert_resource(NextState(PongState::InGame));
+    }
 }
 
 // End Systems

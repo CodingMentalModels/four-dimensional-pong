@@ -27,6 +27,7 @@ impl Plugin for PongPlugin {
         .add_system(collision_system.run_in_state(PongState::InGame))
         .add_system(projection_system.run_in_state(PongState::InGame))
         .add_system(render_system.run_in_state(PongState::InGame))
+        .add_system(render_system.run_in_state(PongState::Paused))
         .add_system(score_system.run_in_state(PongState::InGame));
     }
 }
@@ -59,10 +60,14 @@ fn ball_initial_velocity_system(
 }
 
 fn input_system(
+    mut commands: Commands,
     keyboard_input: Res<Input<KeyCode>>,
     mut paddle_query: Query<&mut VelocityComponent, With<PlayerInputComponent>>,
 ) {
-    for (mut velocity) in paddle_query.iter_mut() {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        commands.insert_resource(NextState(PongState::Paused));
+    }
+    for mut velocity in paddle_query.iter_mut() {
         if keyboard_input.just_pressed(KeyCode::W) {
             velocity.0 += PADDLE_SPEED*Vec4::new(0., 0., 1., 0.);
         }

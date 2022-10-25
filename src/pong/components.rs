@@ -1,9 +1,12 @@
 use bevy::prelude::*;
-use crate::pong::player::Player;
+use crate::pong::player::*;
 use crate::pong::rotations::Rotation;
 
 #[derive(Component, Clone, Copy)]
 pub struct PlayerInputComponent;
+
+#[derive(Component, Clone, Copy)]
+pub struct AIComponent(pub Target);
 
 #[derive(Component, Clone, Copy)]
 pub struct BallComponent;

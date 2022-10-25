@@ -18,6 +18,8 @@ use crate::pong::constants::*;
 use crate::pong::rotations::*;
 use crate::pong::player::Player;
 
+use super::player::Target;
+
 const GLTF_PATH: &str = "four-dimensional-pong.glb";
 
 pub struct LoadAssetsPlugin;
@@ -137,7 +139,7 @@ fn stage_load_system(
             &ball_material,
             Vec4::ZERO,
             BallComponent,
-            None,
+            None::<AIComponent>,
         );
         
         let player_starting_position = Vec4::new(0., 0., -PADDLE_STARTING_OFFSET, -(ARENA_LENGTH / 2.));
@@ -161,7 +163,7 @@ fn stage_load_system(
             &opponent_paddle_material,
             opponent_starting_position,
             PaddleComponent(Player::Red),
-            None,
+            Some(AIComponent(Target::new(Vec3::ZERO))),
         );
 
         let x_from_blender = 0.0;
@@ -216,7 +218,7 @@ fn spawn_object_and_projections(
     material: &Handle<StandardMaterial>,
     position: Vec4,
     label_component: impl Component + Copy,
-    input_component: Option<PlayerInputComponent>,
+    input_or_ai_component: Option<impl Component + Copy>,
 ) {
     // Spawn actual object for the main camera
     let entity = spawn_object(
@@ -226,7 +228,7 @@ fn spawn_object_and_projections(
         material,
         position,
         label_component,
-        input_component,
+        input_or_ai_component,
     );
 
     spawn_projection(
@@ -290,7 +292,7 @@ fn spawn_object(
     material: &Handle<StandardMaterial>,
     position: Vec4,
     label_component: impl Component + Copy,
-    input_component: Option<PlayerInputComponent>,
+    input_or_ai_component: Option<impl Component + Copy>,
 ) -> Entity {
     let transform = Transform::from_translation(position.truncate());
     let mut entity_commands = commands.spawn_bundle(
@@ -307,7 +309,7 @@ fn spawn_object(
         .insert(MaterialHandleComponent(material.clone()))
         .insert(NeedsRenderingComponent);
 
-    match input_component {
+    match input_or_ai_component {
         Some(input_component) => {
             entity_commands.insert(input_component);
         },

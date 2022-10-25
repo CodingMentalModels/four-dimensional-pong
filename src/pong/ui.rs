@@ -111,21 +111,27 @@ fn paused_ui_system(
         .show(
             egui_ctx.ctx_mut(), 
             |ui| {
-                ui.label("Paused");
+                let mut ai = ai_query.single_mut();
+                ui.label(
+                egui::RichText::new("Paused")
+                    .size(20.)
+                    .text_style(egui::TextStyle::Heading)
+                    .underline()
+                    .color(egui::Color32::BLACK)
+                );
+                ui.add_space(10.0);
                 let mut new_speed: Option<Speed> = None;
-                new_speed = ai_speed_button(ui, "AI Speed Easy", AI_PADDLE_SPEED_EASY).map_or(new_speed, |s| Some(s));
-                new_speed = ai_speed_button(ui, "AI Speed Medium", AI_PADDLE_SPEED_MEDIUM).map_or(new_speed, |s| Some(s));
-                new_speed = ai_speed_button(ui, "AI Speed Hard", AI_PADDLE_SPEED_HARD).map_or(new_speed, |s| Some(s));
+                new_speed = ai_speed_button(ui, "AI Speed Easy", AI_PADDLE_SPEED_EASY, ai.0).map_or(new_speed, |s| Some(s));
+                new_speed = ai_speed_button(ui, "AI Speed Medium", AI_PADDLE_SPEED_MEDIUM, ai.0).map_or(new_speed, |s| Some(s));
+                new_speed = ai_speed_button(ui, "AI Speed Hard", AI_PADDLE_SPEED_HARD, ai.0).map_or(new_speed, |s| Some(s));
                 match new_speed {
                     Some(speed) => {
-                        for mut ai in ai_query.iter_mut() {
-                            ai.0 = speed;
-                        }
+                        ai.0 = speed;
                     },
                     None => (),
-                }
+                };
             }
-    );
+        );
 }
 
 fn paused_input_system(
@@ -145,8 +151,15 @@ fn ai_speed_button(
     ui: &mut egui::Ui,
     text: &str,
     speed: Speed,
+    previouse_speed: Speed,
 ) -> Option<Speed> {
-    if ui.button(text).clicked() {
+    let color = if speed == previouse_speed {
+        egui::Color32::GREEN
+    } else {
+        egui::Color32::BLACK
+    };
+
+    if ui.button(egui::RichText::new(text).color(color)).clicked() {
         Some(speed)
     } else {
         None

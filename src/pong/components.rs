@@ -15,7 +15,7 @@ pub struct AIComponent(pub Speed);
 pub struct BallComponent;
 
 #[derive(Component, Clone, Copy)]
-pub struct PaddleComponent(pub Player, pub SizeModifier);
+pub struct PaddleComponent(pub Player);
 
 #[derive(Component, Clone, Copy)]
 pub struct GoalComponent;
@@ -28,6 +28,9 @@ pub struct PositionComponent(pub Vec4);
 
 #[derive(Component, Clone, Copy)]
 pub struct VelocityComponent(pub Vec4);
+
+#[derive(Component, Clone, Copy)]
+pub struct ScaleComponent(pub f32);
 
 #[derive(Component, Clone)]
 pub struct ProjectionComponent(pub Entity, pub Vec4, pub Vec<Rotation>);

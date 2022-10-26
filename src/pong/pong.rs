@@ -134,7 +134,7 @@ fn ai_system(
 
 fn collision_system(
     mut ball_query: Query<(&mut PositionComponent, &mut VelocityComponent), With<BallComponent>>,
-    mut paddle_query: Query<(&mut PositionComponent, &PaddleComponent), Without<BallComponent>>,
+    mut paddle_query: Query<(&mut PositionComponent, &PaddleComponent, &ScaleComponent), Without<BallComponent>>,
     mut score_event_writer: EventWriter<ScoreEvent>,
 ) {
     for (mut ball_position, mut ball_velocity) in ball_query.iter_mut() {
@@ -157,16 +157,20 @@ fn collision_system(
                 // Do nothing
             }
         }
-        for (paddle_position, paddle_component) in paddle_query.iter() {
-            let paddle_size_modifier = paddle_component.1;
-            if is_ball_paddle_collision(ball_position.0, paddle_position.0, paddle_size_modifier) {
+        for (paddle_position, paddle_component, scale_component) in paddle_query.iter() {
+            let paddle_scalar = scale_component.0;
+            if is_ball_paddle_collision(
+                ball_position.0,
+                paddle_position.0,
+                paddle_scalar,
+            ) {
                 ball_velocity.0 = reflect_w(ball_velocity.0);
             }
         }
     }
-    for (mut paddle_position, paddle_component) in paddle_query.iter_mut() {
-        let paddle_size_modifier = paddle_component.1;
-        let clamp_distance = ARENA_WIDTH/2. - PADDLE_WIDTH * paddle_size_modifier/2.;
+    for (mut paddle_position, paddle_component, scale_component) in paddle_query.iter_mut() {
+        let paddle_scalar = scale_component.0;
+        let clamp_distance = ARENA_WIDTH/2. - PADDLE_WIDTH * paddle_scalar/2.;
         paddle_position.0 = clamp_3d(
             paddle_position.0, 
             -clamp_distance*Vec3::ONE,
@@ -196,19 +200,12 @@ fn projection_system(
 
 fn render_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, Option<&ProjectionComponent>, Option<&PaddleComponent>), With<NeedsRenderingComponent>>,
+    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, &ScaleComponent, Option<&ProjectionComponent>), With<NeedsRenderingComponent>>,
 ) {
-    for (mut transform, material, position, maybe_projection, maybe_paddle_component) in query.iter_mut() {
+    for (mut transform, material, position, scale_component, maybe_projection) in query.iter_mut() {
         *transform = Transform::from_translation(position.0.truncate());
-        match maybe_paddle_component {
-            Some(paddle_component) => {
-                let paddle_size_modifier = paddle_component.1;
-                transform.scale = Vec3::ONE * paddle_size_modifier;
-            },
-            None => {
-                // Do nothing
-            }
-        }
+        let scale_modifier = scale_component.0;
+        transform.scale = Vec3::ONE * scale_modifier;
         match maybe_projection {
             Some(_) => {
                 // Do nothing, let the material get updated by the non-projected w.  

@@ -138,6 +138,7 @@ fn stage_load_system(
             &ball,
             &ball_material,
             Vec4::ZERO,
+            1.0,
             BallComponent,
             None::<AIComponent>,
         );
@@ -151,7 +152,8 @@ fn stage_load_system(
             &player_paddle,
             &player_paddle_material,
             player_starting_position,
-            PaddleComponent(Player::Blue, PADDLE_WIDTH_MODIFIER_MEDIUM),
+            PADDLE_WIDTH_MODIFIER_MEDIUM,
+            PaddleComponent(Player::Blue),
             Some(PlayerInputComponent),
         );
 
@@ -162,7 +164,8 @@ fn stage_load_system(
             &opponent_paddle,
             &opponent_paddle_material,
             opponent_starting_position,
-            PaddleComponent(Player::Red, PADDLE_WIDTH_MODIFIER_MEDIUM),
+            PADDLE_WIDTH_MODIFIER_MEDIUM,
+            PaddleComponent(Player::Red),
             Some(AIComponent(AI_PADDLE_SPEED_MEDIUM)),
         );
 
@@ -217,6 +220,7 @@ fn spawn_object_and_projections(
     mesh: &Handle<GltfMesh>,
     material: &Handle<StandardMaterial>,
     position: Vec4,
+    scale_factor: f32,
     label_component: impl Component + Copy,
     input_or_ai_component: Option<impl Component + Copy>,
 ) {
@@ -227,6 +231,7 @@ fn spawn_object_and_projections(
         mesh,
         material,
         position,
+        scale_factor,
         label_component,
         input_or_ai_component,
     );
@@ -247,6 +252,7 @@ fn spawn_object_and_projections(
             0.,
             0.
         ),
+        scale_factor,
     );
 
     spawn_projection(
@@ -264,6 +270,7 @@ fn spawn_object_and_projections(
             0.,
             0.
         ),
+        scale_factor,
     );
 
     spawn_projection(
@@ -282,6 +289,7 @@ fn spawn_object_and_projections(
             0.,
             0.,
         ),
+        scale_factor,
     );
 }
 
@@ -291,6 +299,7 @@ fn spawn_object(
     mesh: &Handle<GltfMesh>,
     material: &Handle<StandardMaterial>,
     position: Vec4,
+    scale_factor: f32,
     label_component: impl Component + Copy,
     input_or_ai_component: Option<impl Component + Copy>,
 ) -> Entity {
@@ -306,6 +315,7 @@ fn spawn_object(
     entity_commands.insert(label_component)
         .insert(PositionComponent(position))
         .insert(VelocityComponent(Vec4::ZERO))
+        .insert(ScaleComponent(scale_factor))
         .insert(MaterialHandleComponent(material.clone()))
         .insert(NeedsRenderingComponent);
 
@@ -327,6 +337,7 @@ fn spawn_projection(
     object_id: Entity,
     projection_rotations: Vec<Rotation>,
     projection_translation: Vec4,
+    projection_scalar: f32,
 ) {
     let projection_transform = Transform::from_translation(projection_translation.truncate());
     let mut entity_commands = commands.spawn_bundle(
@@ -341,6 +352,7 @@ fn spawn_projection(
         .insert(PositionComponent(projection_translation))
         .insert(ProjectionComponent(object_id, projection_translation, projection_rotations))
         .insert(MaterialHandleComponent(material.clone()))
+        .insert(ScaleComponent(projection_scalar))
         .insert(NeedsRenderingComponent);
 
 }

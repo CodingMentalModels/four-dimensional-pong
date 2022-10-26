@@ -556,7 +556,7 @@ mod test_pong_plugin {
         assert!(!is_ball_paddle_collision(Vec4::new(1., 2. + just_beyond_distance, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3. + just_beyond_distance, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         
-        let max_diagonal = (Vec3::ONE * PADDLE_WIDTH/2.0);
+        let max_diagonal = Vec3::ONE * PADDLE_WIDTH/2.0;
         assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal - 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal + 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
     }

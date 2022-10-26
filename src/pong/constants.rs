@@ -13,10 +13,12 @@ pub const BALL_RADIUS: f32 = 0.03;
 
 pub const PADDLE_STARTING_OFFSET: f32 = 0.5;
 pub const PADDLE_WIDTH: f32 = 0.1;
-pub const PADDLE_WIDTH_MODIFIER_EASY: f32 = 10.0;
-pub const PADDLE_WIDTH_MODIFIER_MEDIUM: f32 = 3.0;
-pub const PADDLE_WIDTH_MODIFIER_HARD: f32 = 1.0;
+pub const PADDLE_SIZE_EASY: f32 = 10.0;
+pub const PADDLE_SIZE_MEDIUM: f32 = 3.0;
+pub const PADDLE_SIZE_HARD: f32 = 1.0;
 pub const PADDLE_SPEED: f32 = 2.0;
 pub const AI_PADDLE_SPEED_EASY: f32 = 0.5;
 pub const AI_PADDLE_SPEED_MEDIUM: f32 = 1.0;
 pub const AI_PADDLE_SPEED_HARD: f32 = PADDLE_SPEED;
+
+pub const PAUSE_SCREEN_SPACING: f32 = 50.;

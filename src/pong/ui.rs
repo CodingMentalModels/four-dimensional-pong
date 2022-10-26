@@ -105,6 +105,7 @@ fn ui_system(
 fn paused_ui_system(
     mut egui_ctx: ResMut<EguiContext>,
     mut ai_query: Query<&mut AIComponent>,
+    mut scale_query: Query<&mut ScaleComponent>,
 ) {
     egui::Area::new("pause-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
@@ -120,7 +121,8 @@ fn paused_ui_system(
                             .underline()
                             .color(egui::Color32::BLACK)
                         );
-                        ui.add_space(50.0);
+
+                        ui.add_space(PAUSE_SCREEN_SPACING);
                         let mut ai = ai_query.single_mut();
                         let mut new_speed: Option<Speed> = None;
                         new_speed = ai_speed_button(ui, "AI Speed Easy", AI_PADDLE_SPEED_EASY, ai.0).map_or(new_speed, |s| Some(s));
@@ -132,6 +134,21 @@ fn paused_ui_system(
                             },
                             None => (),
                         };
+
+                        ui.add_space(PAUSE_SCREEN_SPACING);
+                        let current_scale = scale_query.iter().next().expect("We'll always have a scale component on a Paddle.").0;
+                        let mut new_scale: Option<f32> = None;
+                        new_scale = scale_button(ui, "Paddle Size Easy", PADDLE_SIZE_EASY, current_scale).map_or(new_scale, |s| Some(s));
+                        new_scale = scale_button(ui, "Paddle Size Medium", PADDLE_SIZE_MEDIUM, current_scale).map_or(new_scale, |s| Some(s));
+                        new_scale = scale_button(ui, "Paddle Size Hard", PADDLE_SIZE_HARD, current_scale).map_or(new_scale, |s| Some(s));
+                        for mut scale in scale_query.iter_mut() {
+                            match new_scale {
+                                Some(s) => {
+                                    scale.0 = s;
+                                },
+                                None => (),
+                            };
+                        }
                     }
                 );
             }
@@ -165,6 +182,25 @@ fn ai_speed_button(
 
     if ui.button(egui::RichText::new(text).color(color)).clicked() {
         Some(speed)
+    } else {
+        None
+    }
+}
+
+fn scale_button(
+    ui: &mut egui::Ui,
+    text: &str,
+    scale: f32,
+    previous_scale: f32,
+) -> Option<f32> {
+    let color = if scale == previous_scale {
+        egui::Color32::GREEN
+    } else {
+        egui::Color32::WHITE
+    };
+
+    if ui.button(egui::RichText::new(text).color(color)).clicked() {
+        Some(scale)
     } else {
         None
     }

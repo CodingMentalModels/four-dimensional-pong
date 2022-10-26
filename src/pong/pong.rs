@@ -200,11 +200,11 @@ fn projection_system(
 
 fn render_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, &ScaleComponent, Option<&ProjectionComponent>), With<NeedsRenderingComponent>>,
+    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, Option<&ScaleComponent>, Option<&ProjectionComponent>), With<NeedsRenderingComponent>>,
 ) {
-    for (mut transform, material, position, scale_component, maybe_projection) in query.iter_mut() {
+    for (mut transform, material, position, maybe_scale_component, maybe_projection) in query.iter_mut() {
         *transform = Transform::from_translation(position.0.truncate());
-        let scale_modifier = scale_component.0;
+        let scale_modifier = maybe_scale_component.unwrap_or(&ScaleComponent(1.)).0;
         transform.scale = Vec3::ONE * scale_modifier;
         match maybe_projection {
             Some(_) => {

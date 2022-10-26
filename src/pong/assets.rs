@@ -33,6 +33,7 @@ impl Plugin for LoadAssetsPlugin {
                     brightness: 1.0 / 2.0,
                 }
             )
+            .insert_resource(ClearColor(Color::rgba(0.0, 0.0, 0.0, 0.0)))
             .add_enter_system(PongState::LoadingAssets, load_gltf)
             .add_enter_system(PongState::LoadingAssets, instantiate_projection_images)
             .add_system(stage_load_system.run_in_state(PongState::LoadingAssets));

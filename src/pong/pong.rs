@@ -27,6 +27,7 @@ impl Plugin for PongPlugin {
         .add_system(collision_system.run_in_state(PongState::InGame))
         .add_system(projection_system.run_in_state(PongState::InGame))
         .add_system(render_system.run_in_state(PongState::InGame))
+        .add_system(render_system.run_in_state(PongState::Paused))
         .add_system(score_system.run_in_state(PongState::InGame));
     }
 }
@@ -59,10 +60,14 @@ fn ball_initial_velocity_system(
 }
 
 fn input_system(
+    mut commands: Commands,
     keyboard_input: Res<Input<KeyCode>>,
     mut paddle_query: Query<&mut VelocityComponent, With<PlayerInputComponent>>,
 ) {
-    for (mut velocity) in paddle_query.iter_mut() {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        commands.insert_resource(NextState(PongState::Paused));
+    }
+    for mut velocity in paddle_query.iter_mut() {
         if keyboard_input.just_pressed(KeyCode::W) {
             velocity.0 += PADDLE_SPEED*Vec4::new(0., 0., 1., 0.);
         }
@@ -114,21 +119,22 @@ fn movement_system(
 }
 
 fn ai_system(
-    mut ball_query: Query<(&PositionComponent, &mut VelocityComponent), With<BallComponent>>,
-    mut paddle_query: Query<(&PositionComponent, &mut VelocityComponent, &mut AIComponent), Without<BallComponent>>,
+    mut ball_query: Query<(&PositionComponent, &VelocityComponent), With<BallComponent>>,
+    mut paddle_query: Query<(&PositionComponent, &mut VelocityComponent, &AIComponent), Without<BallComponent>>,
 ) {
-    for (ball_position, mut ball_velocity) in ball_query.iter_mut() {
-        for (paddle_position, mut paddle_velocity, mut ai_component) in paddle_query.iter_mut() {
+    for (ball_position, ball_velocity) in ball_query.iter_mut() {
+        for (paddle_position, mut paddle_velocity, ai_component) in paddle_query.iter_mut() {
+            let paddle_speed = ai_component.0;
             let mut direction = (ball_position.0 - paddle_position.0).truncate();
             direction = direction.normalize();
-            paddle_velocity.0 = (direction * PADDLE_SPEED).extend(0.);
+            paddle_velocity.0 = (direction * paddle_speed).extend(0.);
         }
     }
 }
 
 fn collision_system(
     mut ball_query: Query<(&mut PositionComponent, &mut VelocityComponent), With<BallComponent>>,
-    mut paddle_query: Query<(&mut PositionComponent, &PaddleComponent), Without<BallComponent>>,
+    mut paddle_query: Query<(&mut PositionComponent, &PaddleComponent, &ScaleComponent), Without<BallComponent>>,
     mut score_event_writer: EventWriter<ScoreEvent>,
 ) {
     for (mut ball_position, mut ball_velocity) in ball_query.iter_mut() {
@@ -151,14 +157,20 @@ fn collision_system(
                 // Do nothing
             }
         }
-        for (paddle_position, _) in paddle_query.iter() {
-            if is_ball_paddle_collision(ball_position.0, paddle_position.0) {
+        for (paddle_position, paddle_component, scale_component) in paddle_query.iter() {
+            let paddle_scalar = scale_component.0;
+            if is_ball_paddle_collision(
+                ball_position.0,
+                paddle_position.0,
+                paddle_scalar,
+            ) {
                 ball_velocity.0 = reflect_w(ball_velocity.0);
             }
         }
     }
-    for (mut paddle_position, _) in paddle_query.iter_mut() {
-        let clamp_distance = ARENA_WIDTH/2. - PADDLE_WIDTH/2.;
+    for (mut paddle_position, paddle_component, scale_component) in paddle_query.iter_mut() {
+        let paddle_scalar = scale_component.0;
+        let clamp_distance = ARENA_WIDTH/2. - PADDLE_WIDTH * paddle_scalar/2.;
         paddle_position.0 = clamp_3d(
             paddle_position.0, 
             -clamp_distance*Vec3::ONE,
@@ -188,13 +200,18 @@ fn projection_system(
 
 fn render_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, Option<&ProjectionComponent>), With<NeedsRenderingComponent>>,
+    mut query: Query<(&mut Transform, &mut MaterialHandleComponent, &PositionComponent, Option<&ScaleComponent>, Option<&ProjectionComponent>), With<NeedsRenderingComponent>>,
 ) {
-    for (mut transform, material, position, maybe_projection) in query.iter_mut() {
+    for (mut transform, material, position, maybe_scale_component, maybe_projection) in query.iter_mut() {
         *transform = Transform::from_translation(position.0.truncate());
+        let scale_modifier = maybe_scale_component.unwrap_or(&ScaleComponent(1.)).0;
+        transform.scale = Vec3::ONE * scale_modifier;
         match maybe_projection {
             Some(_) => {
-                // Do nothing, let the material get updated by the non-projected w.  
+                // Let the material get updated by the non-projected w.
+                
+                // For projected objects, we don't want to scale them in the w direction (which is represented in the projection as x)
+                transform.scale = Vec3::new(1., transform.scale.y, transform.scale.z);
             },
             None => {
                 match materials.get_mut(&material.0) {
@@ -265,10 +282,10 @@ fn is_wall_collision(ball_position: Vec4) -> Option<Axis> {
     }
 }
 
-fn is_ball_paddle_collision(ball_position: Vec4, paddle_position: Vec4) -> bool {
+fn is_ball_paddle_collision(ball_position: Vec4, paddle_position: Vec4, paddle_size_modifier: SizeModifier) -> bool {
 
     let ball_radius = BALL_RADIUS;
-    let paddle_radius = PADDLE_WIDTH/2.;
+    let paddle_radius = (PADDLE_WIDTH * paddle_size_modifier)/2.;
 
     // Paddle has no depth, so return false if ball is not in the same plane as the paddle.
     if (ball_position.w - paddle_position.w).abs() > ball_radius {
@@ -498,23 +515,23 @@ mod test_pong_plugin {
 
     #[test]
     fn test_is_ball_paddle_collision() {
-        assert!(is_ball_paddle_collision(Vec4::ZERO, Vec4::ZERO));
-        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., -ARENA_LENGTH/2.)));
+        assert!(is_ball_paddle_collision(Vec4::ZERO, Vec4::ZERO, 1.0));
+        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., -ARENA_LENGTH/2.), 1.0));
         
-        assert!(is_ball_paddle_collision(Vec4::new(1. + BALL_RADIUS, 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(is_ball_paddle_collision(Vec4::new(1., 2. + BALL_RADIUS, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3. + BALL_RADIUS, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(is_ball_paddle_collision(Vec4::new(1. + BALL_RADIUS, 2. + BALL_RADIUS, 3. + BALL_RADIUS, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
+        assert!(is_ball_paddle_collision(Vec4::new(1. + BALL_RADIUS, 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(is_ball_paddle_collision(Vec4::new(1., 2. + BALL_RADIUS, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3. + BALL_RADIUS, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(is_ball_paddle_collision(Vec4::new(1. + BALL_RADIUS, 2. + BALL_RADIUS, 3. + BALL_RADIUS, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         
         let just_beyond_distance = BALL_RADIUS + PADDLE_WIDTH/2. + 0.1;
-        assert!(!is_ball_paddle_collision(Vec4::new(1. + just_beyond_distance, 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(!is_ball_paddle_collision(Vec4::new(1., 2. + just_beyond_distance, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3. + just_beyond_distance, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
+        assert!(!is_ball_paddle_collision(Vec4::new(1. + just_beyond_distance, 2., 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(!is_ball_paddle_collision(Vec4::new(1., 2. + just_beyond_distance, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3. + just_beyond_distance, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         
         let max_diagonal = (Vec3::ONE * PADDLE_WIDTH/2.0);
-        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal - 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
-        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal + 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.)));
+        assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal - 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+        assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal + 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
     }
 
     #[test]

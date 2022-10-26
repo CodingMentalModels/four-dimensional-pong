@@ -2,11 +2,14 @@ use bevy::prelude::*;
 use crate::pong::player::*;
 use crate::pong::rotations::Rotation;
 
+pub type Speed = f32;
+pub type SizeModifier = f32;
+
 #[derive(Component, Clone, Copy)]
 pub struct PlayerInputComponent;
 
 #[derive(Component, Clone, Copy)]
-pub struct AIComponent(pub Target);
+pub struct AIComponent(pub Speed);
 
 #[derive(Component, Clone, Copy)]
 pub struct BallComponent;
@@ -25,6 +28,9 @@ pub struct PositionComponent(pub Vec4);
 
 #[derive(Component, Clone, Copy)]
 pub struct VelocityComponent(pub Vec4);
+
+#[derive(Component, Clone, Copy)]
+pub struct ScaleComponent(pub f32);
 
 #[derive(Component, Clone)]
 pub struct ProjectionComponent(pub Entity, pub Vec4, pub Vec<Rotation>);

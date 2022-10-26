@@ -14,7 +14,9 @@ impl Plugin for UIPlugin {
         app.add_plugin(EguiPlugin)
             .add_enter_system(PongState::LoadingUI, configure_visuals)
             .add_enter_system(PongState::LoadingUI, ui_load_system)
-            .add_system(ui_system.run_in_state(PongState::InGame));
+            .add_system(ui_system.run_in_state(PongState::InGame))
+            .add_system(paused_ui_system.run_in_state(PongState::Paused))
+            .add_system(paused_input_system.run_in_state(PongState::Paused));
     }
 }
 
@@ -100,9 +102,109 @@ fn ui_system(
     instantiate_projection_panel(&mut egui_ctx, zw_image, "zw-projection", "Z-W Projection", egui::Align2::RIGHT_BOTTOM);
 }
 
+fn paused_ui_system(
+    mut egui_ctx: ResMut<EguiContext>,
+    mut ai_query: Query<&mut AIComponent>,
+    mut scale_query: Query<&mut ScaleComponent>,
+) {
+    egui::Area::new("pause-menu")
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(
+            egui_ctx.ctx_mut(), 
+            |ui| {
+                ui.with_layout(
+                    egui::Layout::top_down(egui::Align::Center), |ui| {
+                        ui.label(
+                            egui::RichText::new("Paused")
+                            .size(20.)
+                            .text_style(egui::TextStyle::Heading)
+                            .underline()
+                            .color(egui::Color32::BLACK)
+                        );
+
+                        ui.add_space(PAUSE_SCREEN_SPACING);
+                        let mut ai = ai_query.single_mut();
+                        let mut new_speed: Option<Speed> = None;
+                        new_speed = ai_speed_button(ui, "AI Speed Easy", AI_PADDLE_SPEED_EASY, ai.0).map_or(new_speed, |s| Some(s));
+                        new_speed = ai_speed_button(ui, "AI Speed Medium", AI_PADDLE_SPEED_MEDIUM, ai.0).map_or(new_speed, |s| Some(s));
+                        new_speed = ai_speed_button(ui, "AI Speed Hard", AI_PADDLE_SPEED_HARD, ai.0).map_or(new_speed, |s| Some(s));
+                        match new_speed {
+                            Some(speed) => {
+                                ai.0 = speed;
+                            },
+                            None => (),
+                        };
+
+                        ui.add_space(PAUSE_SCREEN_SPACING);
+                        let current_scale = scale_query.iter().next().expect("We'll always have a scale component on a Paddle.").0;
+                        let mut new_scale: Option<f32> = None;
+                        new_scale = scale_button(ui, "Paddle Size Easy", PADDLE_SIZE_EASY, current_scale).map_or(new_scale, |s| Some(s));
+                        new_scale = scale_button(ui, "Paddle Size Medium", PADDLE_SIZE_MEDIUM, current_scale).map_or(new_scale, |s| Some(s));
+                        new_scale = scale_button(ui, "Paddle Size Hard", PADDLE_SIZE_HARD, current_scale).map_or(new_scale, |s| Some(s));
+                        for mut scale in scale_query.iter_mut() {
+                            match new_scale {
+                                Some(s) => {
+                                    scale.0 = s;
+                                },
+                                None => (),
+                            };
+                        }
+                    }
+                );
+            }
+        );
+}
+
+fn paused_input_system(
+    mut commands: Commands,
+    keyboard_input: Res<Input<KeyCode>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        commands.insert_resource(NextState(PongState::InGame));
+    }
+}
+
 // End Systems
 
 // Helper functions
+
+fn ai_speed_button(
+    ui: &mut egui::Ui,
+    text: &str,
+    speed: Speed,
+    previous_speed: Speed,
+) -> Option<Speed> {
+    let color = if speed == previous_speed {
+        egui::Color32::GREEN
+    } else {
+        egui::Color32::WHITE
+    };
+
+    if ui.button(egui::RichText::new(text).color(color)).clicked() {
+        Some(speed)
+    } else {
+        None
+    }
+}
+
+fn scale_button(
+    ui: &mut egui::Ui,
+    text: &str,
+    scale: f32,
+    previous_scale: f32,
+) -> Option<f32> {
+    let color = if scale == previous_scale {
+        egui::Color32::GREEN
+    } else {
+        egui::Color32::WHITE
+    };
+
+    if ui.button(egui::RichText::new(text).color(color)).clicked() {
+        Some(scale)
+    } else {
+        None
+    }
+}
 
 fn instantiate_projection_panel(egui_ctx: &mut EguiContext, image: Handle<Image>, id: &str, label: &str, align: egui::Align2) {
     let texture = egui_ctx.add_image(image);

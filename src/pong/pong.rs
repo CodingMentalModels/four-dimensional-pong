@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom, Rng};
 
-use bevy::{prelude::*, gltf::{Gltf, GltfMesh}, asset::LoadState, render::{camera::{RenderTarget}}};
+use bevy::prelude::*;
 use iyes_loopless::prelude::*;
 
 use crate::pong::components::*;
@@ -148,7 +148,7 @@ fn collision_system(
         }
         match is_wall_collision(ball_position.0) {
             Some(axis) => {
-                ball_velocity.0 = reflect_on_axis_towards_3d_origin(ball_position.0, ball_velocity.0, axis);
+                ball_velocity.0 = reflect_on_axis_towards_zero(ball_position.0, ball_velocity.0, axis);
             },
             None => {
                 // Do nothing
@@ -255,6 +255,22 @@ fn roll_initial_velocity() -> Vec4 {
     Vec4::new(x_velocity, y_velocity, z_velocity, *w_velocity)
 }
 
+fn reflect_on_axis_towards_zero(position: Vec4, velocity: Vec4, axis: Axis) -> Vec4 {
+    let reflected_velocity = reflect_on_axis(velocity, axis);
+    let toward_zero = match axis {
+        Axis::X => -position.x.signum()*Vec4::X,
+        Axis::Y => -position.y.signum()*Vec4::Y,
+        Axis::Z => -position.z.signum()*Vec4::Z,
+        Axis::W => -position.w.signum()*Vec4::W,
+    };
+    let is_toward_zero = reflected_velocity.dot(toward_zero) > 0.;
+    if is_toward_zero {
+        reflected_velocity
+    } else {
+        velocity
+    }
+}
+
 fn reflect_on_axis_towards_3d_origin(position: Vec4, velocity: Vec4, axis: Axis) -> Vec4 {
     let reflected_velocity = reflect_on_axis(velocity, axis);
     match is_towards_origin_3d(position, reflected_velocity) {
@@ -281,11 +297,11 @@ fn reflect_w(vector: Vec4) -> Vec4 {
 }
 
 fn is_wall_collision(ball_position: Vec4) -> Option<Axis> {
-    if ball_position.x.abs() > ARENA_WIDTH/2. {
+    if ball_position.x.abs() + BALL_RADIUS > ARENA_WIDTH/2. {
         Some(Axis::X)
-    } else if ball_position.y.abs() > ARENA_WIDTH/2. {
+    } else if ball_position.y.abs() + BALL_RADIUS > ARENA_WIDTH/2. {
         Some(Axis::Y)
-    } else if ball_position.z.abs() > ARENA_WIDTH/2. {
+    } else if ball_position.z.abs() + BALL_RADIUS > ARENA_WIDTH/2. {
         Some(Axis::Z)
     } else {
         None
@@ -376,7 +392,6 @@ fn clamp_3d(
 #[cfg(test)]
 mod test_pong_plugin {
     use bevy::{asset::AssetPlugin, gltf::GltfPlugin, window::WindowPlugin, input::InputPlugin};
-    use bevy_egui::EguiPlugin;
 
     use crate::pong::{ui::UIPlugin, assets::LoadAssetsPlugin};
 

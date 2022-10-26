@@ -13,7 +13,7 @@ pub const BALL_RADIUS: f32 = 0.03;
 
 pub const PADDLE_STARTING_OFFSET: f32 = 0.5;
 pub const PADDLE_WIDTH: f32 = 0.1;
-pub const PADDLE_SIZE_EASY: f32 = 10.0;
+pub const PADDLE_SIZE_EASY: f32 = 5.0;
 pub const PADDLE_SIZE_MEDIUM: f32 = 3.0;
 pub const PADDLE_SIZE_HARD: f32 = 1.0;
 pub const PADDLE_SPEED: f32 = 2.0;

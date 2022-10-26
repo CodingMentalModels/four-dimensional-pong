@@ -208,7 +208,9 @@ fn render_system(
         transform.scale = Vec3::ONE * scale_modifier;
         match maybe_projection {
             Some(_) => {
-                // Do nothing, let the material get updated by the non-projected w.  
+                // Let the material get updated by the non-projected w.
+                
+                transform.scale = Vec3::new(1., transform.scale.y, transform.scale.z);
             },
             None => {
                 match materials.get_mut(&material.0) {

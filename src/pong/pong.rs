@@ -210,6 +210,7 @@ fn render_system(
             Some(_) => {
                 // Let the material get updated by the non-projected w.
                 
+                // For projected objects, we don't want to scale them in the w direction (which is represented in the projection as x)
                 transform.scale = Vec3::new(1., transform.scale.y, transform.scale.z);
             },
             None => {

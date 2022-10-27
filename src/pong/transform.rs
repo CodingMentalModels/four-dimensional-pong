@@ -16,6 +16,24 @@ mod test_transforms {
     use super::*;
 
     #[test]
+    fn test_matrix_multiplication() {
+        let m_1 = Mat2::from_cols_array(&[
+            1., 2.,
+            3., 4.,
+        ]).transpose();
+
+        let m_2 = Mat2::from_cols_array(&[
+            -5., 10.,
+            -5., 5.,
+        ]).transpose();
+
+        assert_eq!(m_1 * m_2, Mat2::from_cols_array(&[
+            -15., 20.,
+            -35., 50.,
+        ]).transpose());
+    }
+
+    #[test]
     fn test_transforms_to_matrices() {
         let translation = Transform::from_translation(Vec3::new(1.0, 2.0, 3.0));
         let matrix = translation.compute_matrix();

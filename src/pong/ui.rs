@@ -23,10 +23,12 @@ impl Plugin for UIPlugin {
 // Systems
 
 fn configure_visuals(mut egui_ctx: ResMut<EguiContext>) {
-    egui_ctx.ctx_mut().set_visuals(egui::Visuals {
-        window_rounding: 0.0.into(),
-        ..Default::default()
-    });
+    egui_ctx.ctx_mut().set_visuals(
+        egui::Visuals {
+            window_rounding: 0.0.into(),
+            ..Default::default()
+        }
+    );
 }
 
 fn ui_load_system(

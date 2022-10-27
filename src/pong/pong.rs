@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom, Rng};
 
-use bevy::{prelude::*, gltf::{Gltf, GltfMesh}, asset::LoadState, render::{camera::{RenderTarget}}};
+use bevy::prelude::*;
 use iyes_loopless::prelude::*;
 
 use crate::pong::components::*;
@@ -8,9 +8,6 @@ use crate::pong::resources::*;
 use crate::pong::constants::*;
 use crate::pong::player::Player;
 use crate::pong::axis::Axis;
-
-use super::rotations::{Rotation, Axis4};
-
 
 pub struct PongPlugin;
 
@@ -52,9 +49,9 @@ struct ScoreEvent(Player);
 // Systems
 
 fn ball_initial_velocity_system(
-    mut ball_query: Query<(&mut VelocityComponent), With<BallComponent>>,
+    mut ball_query: Query<&mut VelocityComponent, With<BallComponent>>,
 ) {
-    for (mut velocity) in ball_query.iter_mut() {
+    for mut velocity in ball_query.iter_mut() {
         velocity.0 = roll_initial_velocity();
     }
 }
@@ -122,7 +119,7 @@ fn ai_system(
     mut ball_query: Query<(&PositionComponent, &VelocityComponent), With<BallComponent>>,
     mut paddle_query: Query<(&PositionComponent, &mut VelocityComponent, &AIComponent), Without<BallComponent>>,
 ) {
-    for (ball_position, ball_velocity) in ball_query.iter_mut() {
+    for (ball_position, _ball_velocity) in ball_query.iter_mut() {
         for (paddle_position, mut paddle_velocity, ai_component) in paddle_query.iter_mut() {
             let paddle_speed = ai_component.0;
             let mut direction = (ball_position.0 - paddle_position.0).truncate();
@@ -151,13 +148,13 @@ fn collision_system(
         }
         match is_wall_collision(ball_position.0) {
             Some(axis) => {
-                ball_velocity.0 = reflect_on_axis(ball_velocity.0, axis);
+                ball_velocity.0 = reflect_on_axis_towards_zero(ball_position.0, ball_velocity.0, axis);
             },
             None => {
                 // Do nothing
             }
         }
-        for (paddle_position, paddle_component, scale_component) in paddle_query.iter() {
+        for (paddle_position, _paddle_component, scale_component) in paddle_query.iter() {
             let paddle_scalar = scale_component.0;
             if is_ball_paddle_collision(
                 ball_position.0,
@@ -168,13 +165,14 @@ fn collision_system(
             }
         }
     }
-    for (mut paddle_position, paddle_component, scale_component) in paddle_query.iter_mut() {
+    for (mut paddle_position, _paddle_component, scale_component) in paddle_query.iter_mut() {
         let paddle_scalar = scale_component.0;
         let clamp_distance = ARENA_WIDTH/2. - PADDLE_WIDTH * paddle_scalar/2.;
         paddle_position.0 = clamp_3d(
             paddle_position.0, 
             -clamp_distance*Vec3::ONE,
             clamp_distance*Vec3::ONE,
+            CLAMP_PADDING,
         );
     }
 }
@@ -257,12 +255,40 @@ fn roll_initial_velocity() -> Vec4 {
     Vec4::new(x_velocity, y_velocity, z_velocity, *w_velocity)
 }
 
-fn reflect_on_axis(position: Vec4, axis: Axis) -> Vec4 {
+fn reflect_on_axis_towards_zero(position: Vec4, velocity: Vec4, axis: Axis) -> Vec4 {
+    let reflected_velocity = reflect_on_axis(velocity, axis);
+    let toward_zero = match axis {
+        Axis::X => -position.x.signum()*Vec4::X,
+        Axis::Y => -position.y.signum()*Vec4::Y,
+        Axis::Z => -position.z.signum()*Vec4::Z,
+        Axis::W => -position.w.signum()*Vec4::W,
+    };
+    let is_toward_zero = reflected_velocity.dot(toward_zero) > 0.;
+    if is_toward_zero {
+        reflected_velocity
+    } else {
+        velocity
+    }
+}
+
+fn reflect_on_axis_towards_3d_origin(position: Vec4, velocity: Vec4, axis: Axis) -> Vec4 {
+    let reflected_velocity = reflect_on_axis(velocity, axis);
+    match is_towards_origin_3d(position, reflected_velocity) {
+        true => reflected_velocity,
+        false => velocity,
+    }
+}
+
+fn is_towards_origin_3d(position: Vec4, velocity: Vec4) -> bool {
+    velocity.truncate().dot(-position.truncate()) >= 0.
+}
+
+fn reflect_on_axis(velocity: Vec4, axis: Axis) -> Vec4 {
     match axis {
-        Axis::X => Vec4::new(-position.x, position.y, position.z, position.w),
-        Axis::Y => Vec4::new(position.x, -position.y, position.z, position.w),
-        Axis::Z => Vec4::new(position.x, position.y, -position.z, position.w),
-        Axis::W => Vec4::new(position.x, position.y, position.z, -position.w),
+        Axis::X => Vec4::new(-velocity.x, velocity.y, velocity.z, velocity.w),
+        Axis::Y => Vec4::new(velocity.x, -velocity.y, velocity.z, velocity.w),
+        Axis::Z => Vec4::new(velocity.x, velocity.y, -velocity.z, velocity.w),
+        Axis::W => Vec4::new(velocity.x, velocity.y, velocity.z, -velocity.w),
     }
 }
 
@@ -271,11 +297,11 @@ fn reflect_w(vector: Vec4) -> Vec4 {
 }
 
 fn is_wall_collision(ball_position: Vec4) -> Option<Axis> {
-    if ball_position.x.abs() > ARENA_WIDTH/2. {
+    if ball_position.x.abs() + BALL_RADIUS > ARENA_WIDTH/2. {
         Some(Axis::X)
-    } else if ball_position.y.abs() > ARENA_WIDTH/2. {
+    } else if ball_position.y.abs() + BALL_RADIUS > ARENA_WIDTH/2. {
         Some(Axis::Y)
-    } else if ball_position.z.abs() > ARENA_WIDTH/2. {
+    } else if ball_position.z.abs() + BALL_RADIUS > ARENA_WIDTH/2. {
         Some(Axis::Z)
     } else {
         None
@@ -351,11 +377,13 @@ fn clamp_3d(
     position: Vec4,
     min: Vec3,
     max: Vec3,
+    padding: f32,
 ) -> Vec4 {
+    assert!(padding >= 0.);
     let mut to_return = position;
-    to_return.x = to_return.x.clamp(min.x, max.x);
-    to_return.y = to_return.y.clamp(min.y, max.y);
-    to_return.z = to_return.z.clamp(min.z, max.z);
+    to_return.x = to_return.x.clamp(min.x + padding, max.x - padding);
+    to_return.y = to_return.y.clamp(min.y + padding, max.y - padding);
+    to_return.z = to_return.z.clamp(min.z + padding, max.z - padding);
     return to_return;
 }
 
@@ -364,7 +392,6 @@ fn clamp_3d(
 #[cfg(test)]
 mod test_pong_plugin {
     use bevy::{asset::AssetPlugin, gltf::GltfPlugin, window::WindowPlugin, input::InputPlugin};
-    use bevy_egui::EguiPlugin;
 
     use crate::pong::{ui::UIPlugin, assets::LoadAssetsPlugin};
 
@@ -529,9 +556,20 @@ mod test_pong_plugin {
         assert!(!is_ball_paddle_collision(Vec4::new(1., 2. + just_beyond_distance, 3., ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3. + just_beyond_distance, ARENA_LENGTH/2.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         
-        let max_diagonal = (Vec3::ONE * PADDLE_WIDTH/2.0);
+        let max_diagonal = Vec3::ONE * PADDLE_WIDTH/2.0;
         assert!(is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal - 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
         assert!(!is_ball_paddle_collision(Vec4::new(1., 2., 3., ARENA_LENGTH/2.) - (max_diagonal + 0.01).extend(0.), Vec4::new(1., 2., 3., ARENA_LENGTH/2.), 1.0));
+    }
+
+    #[test]
+    fn test_is_towards_origin() {
+        assert!(is_towards_origin_3d(Vec4::new(1., 2., 3., 4.), Vec4::ZERO));
+        assert!(!is_towards_origin_3d(Vec4::new(1., 2., 3., 4.), Vec4::new(1., 2., 3., 4.)));
+        assert!(is_towards_origin_3d(Vec4::new(1., 2., 3., 4.), -Vec4::new(1., 2., 3., 4.)));
+
+        assert!(is_towards_origin_3d(Vec4::new(1., 2., 3., 4.), -Vec4::new(4., 4., 4., 4.)));
+        assert!(is_towards_origin_3d(Vec4::new(1., 2., 3., 4.), Vec4::new(-1., -1., -4., 4.)));
+        assert!(!is_towards_origin_3d(Vec4::new(1., 2., 3., 4.), -Vec4::new(-1., -1., -4., 4.)));
     }
 
     #[test]

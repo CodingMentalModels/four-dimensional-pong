@@ -17,6 +17,7 @@ pub const PADDLE_SIZE_EASY: f32 = 5.0;
 pub const PADDLE_SIZE_MEDIUM: f32 = 3.0;
 pub const PADDLE_SIZE_HARD: f32 = 1.0;
 pub const PADDLE_SPEED: f32 = 2.0;
+pub const CLAMP_PADDING: f32 = 0.0001;
 pub const AI_PADDLE_SPEED_EASY: f32 = 0.5;
 pub const AI_PADDLE_SPEED_MEDIUM: f32 = 1.0;
 pub const AI_PADDLE_SPEED_HARD: f32 = PADDLE_SPEED;

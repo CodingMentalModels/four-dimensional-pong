@@ -1,5 +1,3 @@
-use std::f32::consts::TAU;
-
 use bevy::asset::LoadState;
 use bevy::gltf::Gltf;
 use bevy::gltf::GltfMesh;
@@ -17,8 +15,6 @@ use crate::pong::resources::*;
 use crate::pong::constants::*;
 use crate::pong::rotations::*;
 use crate::pong::player::Player;
-
-use super::player::Target;
 
 const GLTF_PATH: &str = "four-dimensional-pong.glb";
 
@@ -144,8 +140,18 @@ fn stage_load_system(
             None::<AIComponent>,
         );
         
-        let player_starting_position = Vec4::new(0., 0., -PADDLE_STARTING_OFFSET, -(ARENA_LENGTH / 2.));
-        let opponent_starting_position = Vec4::new(0., 0., PADDLE_STARTING_OFFSET, (ARENA_LENGTH / 2.0));
+        let player_starting_position = Vec4::new(
+            0.,
+            0.,
+            -PADDLE_STARTING_OFFSET,
+            -ARENA_LENGTH / 2.
+        );
+        let opponent_starting_position = Vec4::new(
+            0.,
+            0.,
+            PADDLE_STARTING_OFFSET,
+            ARENA_LENGTH / 2.0
+        );
 
         spawn_object_and_projections(
             &mut commands,
@@ -199,7 +205,7 @@ fn stage_load_system(
 // Helper Functions
 
 fn spawn_arena_rectangle(
-    mut commands: &mut Commands,
+    commands: &mut Commands,
     assets_gltf_meshes: &Res<Assets<GltfMesh>>,
     rectangular_arena: &Handle<GltfMesh>,
     arena_material: &Handle<StandardMaterial>,

@@ -28,6 +28,11 @@ mod test_transforms {
         ]).transpose();
 
         assert_eq!(m_1 * m_2, Mat2::from_cols_array(&[
+            1. * -5. + 2. * -5., 1. * 10. + 2. * 5.,
+            3. * -5. + 4. * -5., 3. * 10. + 4. * 5.,
+        ]).transpose());
+
+        assert_eq!(m_1 * m_2, Mat2::from_cols_array(&[
             -15., 20.,
             -35., 50.,
         ]).transpose());
@@ -84,6 +89,24 @@ mod test_transforms {
                 ]).transpose()
             )
         );
+
+        
+        let ship_local = Transform::from_translation(Vec3::new(0.0, 0.0, 3.0));
+        let crows_nest_local = Transform::from_translation(Vec3::new(0.0, 0.0, 5.0));
+        let pirate_local = Transform::from_rotation(Quat::from_rotation_x(TAU/8.0)) * Transform::from_translation(Vec3::new(0.0, 0.0, 6.0));
+        let parrot_local = Transform::from_rotation(Quat::from_rotation_x(TAU/100.0)) * Transform::from_translation(Vec3::new(0.5, 0.5, 1.0));
+        let ship_world = ship_local;
+        let crows_nest_world = ship_world * crows_nest_local;
+        let pirate_world = crows_nest_world * pirate_local;
+        let parrot_world = pirate_world * parrot_local;
+
+        let matrix = parrot_world.compute_matrix();
+        assert_eq!(matrix, Mat4::from_cols_array(&[
+            1.0, 0.0, 0.0, 1.0,
+            0.0, 1.0, 0.0, 2.0,
+            0.0, 0.0, 1.0, 3.0,
+            0.0, 0.0, 0.0, 1.0,
+        ]).transpose());
 
     }
 }

@@ -217,7 +217,7 @@ fn instantiate_projection_panel(egui_ctx: &mut EguiContext, image: Handle<Image>
                 ui.set_width(PROJECTION_AREA_WIDTH);
                 ui.set_height(PROJECTION_AREA_HEIGHT);
                 ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-                    ui.label(egui::RichText::new(label).color(egui::Color32::BLACK).underline());
+                    ui.label(egui::RichText::new(label).color(egui::Color32::WHITE).underline());
                     ui.image(texture, egui::vec2(PROJECTION_AREA_WIDTH, PROJECTION_AREA_HEIGHT));
                 });
             }

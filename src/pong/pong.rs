@@ -357,8 +357,8 @@ fn is_goal_collision(position: Vec4) -> Option<Player> {
 fn get_color_from_w(w: f32, arena_length: f32) -> Color {
     let blue = Color::BLUE.as_hsla_f32();
     let red = Color::RED.as_hsla_f32();
-    let saturation = blue[1];
-    let lightness = blue[2];
+    let saturation = 1.0;
+    let lightness = 0.5;
     let alpha = blue[3];
     let factor = (w + arena_length / 2.) / arena_length;
     Color::Hsla {
@@ -576,6 +576,12 @@ mod test_pong_plugin {
     fn test_get_color_from_w() {
         assert_eq!(get_color_from_w(-ARENA_LENGTH/2., ARENA_LENGTH), Color::BLUE.as_hsla());
         assert_eq!(get_color_from_w(ARENA_LENGTH/2., ARENA_LENGTH), Color::RED.as_hsla());
+    }
+
+    #[test]
+    fn test_saturation_and_lightness() {
+        assert_eq!(Color::BLUE.as_hsla_f32()[1], 1.0);
+        assert_eq!(Color::BLUE.as_hsla_f32()[2], 0.5);
     }
 
 }
